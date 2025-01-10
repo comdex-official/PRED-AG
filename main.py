@@ -11,7 +11,7 @@ def main():
     
     # Add interests (you can modify these)
     print("Adding user interests...")
-    #manager.add_user_interest("technology")
+    manager.add_user_interest("technology")
     manager.add_user_interest("sports")
     #manager.add_user_interest("Science")
 

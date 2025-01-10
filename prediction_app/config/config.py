@@ -5,16 +5,11 @@ NEWS_SOURCES = {
     "sports": [
         "https://www.espn.com",
         "https://sports.yahoo.com",
-        "https://www.cbssports.com",
-        # Add more sports news sources
     ],
     "technology": [
-        "https://techcrunch.com",
-        "https://www.theverge.com"  # Adding another reliable source
-    ],
-    "science": [
-        "https://techcrunch.com",
-        "https://www.theverge.com"  # Adding another reliable source
+        "https://news.ycombinator.com",
+        "https://www.reddit.com/r/technology/.json",
+        "https://www.bbc.com/news/technology"
     ]
 }
 
@@ -28,20 +23,20 @@ SCRAPING_RULES = {
         "article_selector": "ul.js-stream-content li",
         "title_selector": "h3"
     },
-    "techcrunch.com": {
-        "article_selector": "article.post-block",
-        "title_selector": "h2.post-block__title a"
-    },
-    "www.theverge.com": {
-        "article_selector": "h2.c-entry-box--compact__title",
+    "news.ycombinator.com": {
+        "article_selector": ".titleline",
         "title_selector": "a"
     },
-    # Add more domain-specific rules
+    "www.bbc.com": {
+        "article_selector": ".gs-c-promo",
+        "title_selector": ".gs-c-promo-heading"
+    }
 }
 
 # Request headers
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
 }
 
 # OpenAI configuration
