@@ -6,12 +6,16 @@ def main():
     # Load environment variables
     load_dotenv()
     
-    # Initialize the prediction manager with Anthropic API key
-    manager = PredictionManager(os.getenv('ANTHROPIC_API_KEY'))
+    # Get username
+    username = input("Enter your username: ")
+    
+    # Initialize the prediction manager with Anthropic API key and username
+    manager = PredictionManager(os.getenv('ANTHROPIC_API_KEY'), username)
     
     # Add interests
     print("Adding user interests...")
-    interests = ["technology", "sports", "football", "cricket", "politics"]
+    #interests = ["technology", "sports", "football", "cricket", "politics"]
+    interests = ["cricket"]
     
     # Let user choose interests
     print("\nAvailable interests:")
@@ -43,6 +47,7 @@ def main():
             
         print("\n=== Generated Question ===")
         print(result["question"])
+        print(f"(Source: {result['source']})")
         print("\n=== Based on Articles ===")
         for article in result["source_articles"]:
             print(f"- {article}")
@@ -51,6 +56,28 @@ def main():
         choice = input("\nWould you like another question? (y/n): ").lower()
         if choice != 'y':
             break
+
+def show_question_history(manager: PredictionManager):
+    """Display question history"""
+    print("\n=== Question History ===")
+    print("1. View all recent questions")
+    print("2. View questions by interest")
+    
+    choice = input("Enter your choice (1-2): ")
+    
+    if choice == "1":
+        questions = manager.get_question_history()
+        for q in questions:
+            print(f"\n[{q['created_at']}] {q['interest'].upper()}")
+            print(f"Q: {q['question']}")
+    elif choice == "2":
+        interest = input("Enter interest: ").lower()
+        questions = manager.get_question_history(interest)
+        for q in questions:
+            print(f"\n[{q['created_at']}]")
+            print(f"Q: {q['question']}")
+    else:
+        print("Invalid choice")
 
 if __name__ == "__main__":
     main()
