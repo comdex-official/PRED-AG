@@ -9,12 +9,28 @@ def main():
     # Initialize the prediction manager with Anthropic API key
     manager = PredictionManager(os.getenv('ANTHROPIC_API_KEY'))
     
-    # Add interests (you can modify these)
+    # Add interests
     print("Adding user interests...")
-    manager.add_user_interest("technology")
-    manager.add_user_interest("sports")
-    #manager.add_user_interest("Science")
-
+    interests = ["technology", "sports", "football", "cricket", "politics"]
+    
+    # Let user choose interests
+    print("\nAvailable interests:")
+    for i, interest in enumerate(interests, 1):
+        print(f"{i}. {interest}")
+    
+    choice = input("\nEnter the number of the interest you want to follow (1-5): ")
+    try:
+        index = int(choice) - 1
+        if 0 <= index < len(interests):
+            chosen_interest = interests[index]
+            manager.add_user_interest(chosen_interest)
+            print(f"\nSelected interest: {chosen_interest}")
+        else:
+            print("Invalid choice. Using default interest: sports")
+            manager.add_user_interest("sports")
+    except ValueError:
+        print("Invalid input. Using default interest: sports")
+        manager.add_user_interest("sports")
     
     while True:
         # Get a new question

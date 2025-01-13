@@ -4,12 +4,28 @@ from typing import Dict
 NEWS_SOURCES = {
     "sports": [
         "https://www.espn.com",
-        "https://sports.yahoo.com",
+        "https://www.reddit.com/r/sports/hot/.json",
+        "https://sports.yahoo.com"
     ],
     "technology": [
         "https://news.ycombinator.com",
-        "https://www.reddit.com/r/technology/.json",
-        "https://www.bbc.com/news/technology"
+        "https://www.reddit.com/r/technology/hot/.json",
+        "https://techcrunch.com"
+    ],
+    "football": [
+        "https://www.reddit.com/r/soccer/hot/.json",
+        "https://www.goal.com/en",
+        "https://www.espn.com/soccer/"
+    ],
+    "cricket": [
+        "https://www.reddit.com/r/Cricket/hot/.json",
+        "https://www.espncricinfo.com",
+        "https://www.cricbuzz.com"
+    ],
+    "politics": [
+        "https://www.reddit.com/r/politics/hot/.json",
+        "https://www.politico.com",
+        "https://thehill.com"
     ]
 }
 
@@ -27,9 +43,25 @@ SCRAPING_RULES = {
         "article_selector": ".titleline",
         "title_selector": "a"
     },
-    "www.bbc.com": {
-        "article_selector": ".gs-c-promo",
-        "title_selector": ".gs-c-promo-heading"
+    "www.goal.com": {
+        "article_selector": "article.card-type-article",
+        "title_selector": "h3"
+    },
+    "www.espncricinfo.com": {
+        "article_selector": ".ds-border-b article",
+        "title_selector": "h2"
+    },
+    "www.cricbuzz.com": {
+        "article_selector": ".cb-nws-hdln",
+        "title_selector": "a"
+    },
+    "www.politico.com": {
+        "article_selector": ".story-card",
+        "title_selector": "h3"
+    },
+    "thehill.com": {
+        "article_selector": ".article-list__item",
+        "title_selector": "h1"
     }
 }
 
