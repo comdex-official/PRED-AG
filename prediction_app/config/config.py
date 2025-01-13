@@ -41,7 +41,8 @@ SCRAPING_RULES = {
     },
     "news.ycombinator.com": {
         "article_selector": ".titleline",
-        "title_selector": "a"
+        "title_selector": "a",
+        "date_selector": ".age"
     },
     "www.goal.com": {
         "article_selector": "article.card-type-article",
@@ -49,11 +50,13 @@ SCRAPING_RULES = {
     },
     "www.espncricinfo.com": {
         "article_selector": ".ds-border-b article",
-        "title_selector": "h2"
+        "title_selector": "h2",
+        "date_selector": "time"
     },
     "www.cricbuzz.com": {
         "article_selector": ".cb-nws-hdln",
-        "title_selector": "a"
+        "title_selector": "a",
+        "date_selector": ".cb-nws-time"
     },
     "www.politico.com": {
         "article_selector": ".story-card",
