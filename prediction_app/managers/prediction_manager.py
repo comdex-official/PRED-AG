@@ -76,3 +76,12 @@ class PredictionManager:
     def reset_used_questions(self, interest: Optional[str] = None) -> None:
         """Reset the 'used' flag for questions, optionally for a specific interest"""
         self.db_manager.reset_used_questions(interest) 
+
+    def get_pending_resolutions(self) -> List[dict]:
+        """Get questions that need resolution"""
+        return self.db_manager.get_pending_resolutions()
+
+    def resolve_question(self, question_id: int, result: str, note: str = None) -> None:
+        """Resolve a question with yes/no result"""
+        result_bool = result.lower() == 'yes'
+        self.db_manager.resolve_question(question_id, result_bool, note) 

@@ -34,6 +34,10 @@ class Question(Base):
     interest = Column(String(50), nullable=False)
     source_articles = Column(Text)  # Stored as JSON string
     created_at = Column(DateTime, default=datetime.utcnow)
+    resolution_date = Column(DateTime)  # When the question should be resolved
+    status = Column(String(20), default='pending')  # pending, resolved, expired
+    result = Column(Boolean, nullable=True)  # True=Yes, False=No, None=Unresolved
+    resolution_note = Column(Text)  # Optional explanation of the result
 
     def __repr__(self):
         return f"<Question(interest='{self.interest}', question='{self.question_text[:50]}...'>"
