@@ -9,13 +9,13 @@ def main():
     # Get username
     username = input("Enter your username: ")
     
-    # Initialize the prediction manager with Anthropic API key and username
-    manager = PredictionManager(os.getenv('ANTHROPIC_API_KEY'), username)
+    # Initialize the prediction manager with username only
+    manager = PredictionManager(username)
     
     # Add interests
     print("Adding user interests...")
-    #interests = ["technology", "sports", "football", "cricket", "politics"]
-    interests = ["football"]
+    interests = ["technology", "sports", "football", "cricket", "politics"]
+    #interests = ["football"]
     
     # Let user choose interests
     print("\nAvailable interests:")
