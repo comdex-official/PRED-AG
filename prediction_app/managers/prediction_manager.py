@@ -9,9 +9,9 @@ from ..agents.question_generator import QuestionGenerator
 from ..database.db_manager import DatabaseManager
 
 class PredictionManager:
-    def __init__(self, api_key: str, username: str):
+    def __init__(self, username: str):
         self.scraper = NewsScraper()
-        self.generator = QuestionGenerator(api_key)
+        self.generator = QuestionGenerator()
         self.interests = set()
         self.db_manager = DatabaseManager()
         

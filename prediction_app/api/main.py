@@ -22,7 +22,7 @@ app.add_middleware(
 # Dependency to get PredictionManager instance
 def get_manager(username: str = Header(..., description="Username for the current user")):
     """Get PredictionManager instance with username from header"""
-    return PredictionManager(os.getenv('ANTHROPIC_API_KEY'), username)
+    return PredictionManager(username)
 
 # Pydantic models for request/response
 class User(BaseModel):
@@ -47,7 +47,7 @@ class QuestionResolution(BaseModel):
 async def create_user(user: User):
     """Create a new user or return existing user"""
     # Create a temporary manager just for user creation
-    manager = PredictionManager(os.getenv('ANTHROPIC_API_KEY'), user.username)
+    manager = PredictionManager(user.username)
     
     # Check if user already exists
     existing_user = manager.db_manager.get_user(user.username)

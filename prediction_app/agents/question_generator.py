@@ -1,123 +1,173 @@
-from anthropic import Anthropic
 from typing import List
+from pydantic import BaseModel, Field, validator
+import random
 
-class QuestionGenerator:
-    def __init__(self, api_key: str):
-        self.client = Anthropic(api_key=api_key)
+class PredictionQuestion(BaseModel):
+    """Pydantic model for validating prediction questions"""
+    question_text: str = Field(..., min_length=20, max_length=150)
+    interest: str
+    source_articles: List[str]
 
-    def generate_question(self, articles: List[str], interest: str) -> str:
-        """Generate a question using Claude based on scraped articles"""
-        prompt = self._create_prompt(articles, interest)
-        max_attempts = 3  # Limit retries
-
-        for attempt in range(max_attempts):
-            try:
-                print(f"Attempt {attempt + 1} to generate question...")
-                response = self.client.messages.create(
-                    model="claude-3-opus-20240229",
-                    messages=[{
-                        "role": "user",
-                        "content": prompt
-                    }],
-                    max_tokens=100
-                )
-                
-                question = response.content[0].text.strip()
-                print(f"Generated: {question}")
-                
-                if self._validate_question(question):
-                    return question
-                else:
-                    print("Question failed validation, retrying...")
-                    
-            except Exception as e:
-                print(f"Error generating question: {str(e)}")
-                
-        # If all attempts fail, return a fallback question
-        return self._generate_fallback_question(articles, interest)
-
-    def _generate_fallback_question(self, articles: List[str], interest: str) -> str:
-        """Generate a simple fallback question if main generation fails"""
-        if not articles:
-            return "Failed to generate question: No articles available"
-            
-        # Extract a named entity from the first article
-        words = articles[0].split()
-        named_entities = [w for w in words if w[0].isupper() and len(w) > 1]
-        entity = named_entities[0] if named_entities else "team"
+    @validator('question_text')
+    def validate_question_format(cls, v):
+        # Must start with specific words
+        if not v.startswith(('Will ', 'Can ')):
+            raise ValueError("Question must start with 'Will' or 'Can'")
         
-        # Generate a simple question
-        return f"Will {entity} succeed this week?"
-
-    def _create_prompt(self, articles: List[str], interest: str) -> str:
-        return f"""
-        Based on these headlines:
-        {' | '.join(articles[:3])}
+        # Must contain a number
+        if not any(char.isdigit() for char in v):
+            raise ValueError("Question must contain a number")
         
-        Generate ONE short yes/no prediction question that:
-        1. Starts with 'Will' or 'Can'
-        2. Includes:
-           - At least one number
-           - A time reference (tomorrow, this week, or specific day)
-           - A person, team, or company name
-        3. Must be:
-           - Under 15 words
-           - Clearly measurable
-           - About a 50-50 chance
-        
-        Examples:
-        - "Will India score 300 runs tomorrow?"
-        - "Can Apple stock rise 5% this week?"
-        - "Will Manchester United win by 2 goals on Saturday?"
-        
-        Return ONLY the question, no other text.
-        """
-
-    def _validate_question(self, question: str) -> bool:
-        """Validate question quality with more lenient rules"""
-        # Check length (between 5 and 20 words)
-        words = question.split()
-        if not (5 <= len(words) <= 20):
-            print("Failed length validation")
-            return False
-            
-        if not question.startswith(('Will ', 'Can ')):
-            print("Failed start word validation")
-            return False
-            
-        # Check for numbers
-        has_number = any(char.isdigit() for char in question)
-        
-        # Check for named entities (capitalized words)
-        capitalized_words = [w for w in words if w[0].isupper() and len(w) > 1]
-        has_entities = len(capitalized_words) >= 1
-        
-        # Expanded time references
+        # Must contain a time reference
         time_markers = [
-            # Days
             'tomorrow', 'today', 'tonight', 'week',
             'monday', 'tuesday', 'wednesday', 'thursday',
-            'friday', 'saturday', 'sunday', 'days', 'next',
-            # Months
-            'january', 'february', 'march', 'april',
-            'may', 'june', 'july', 'august',
-            'september', 'october', 'november', 'december',
-            'jan', 'feb', 'mar', 'apr', 'jun', 'jul',
-            'aug', 'sep', 'oct', 'nov', 'dec',
-            # Ordinals
-            '1st', '2nd', '3rd', '4th', '5th',
-            '6th', '7th', '8th', '9th', '10th',
-            # Other time indicators
-            'weekend', 'upcoming', 'following',
-            'innings', 'match', 'test', 'game'
+            'friday', 'saturday', 'sunday', 'weekend'
         ]
+        if not any(marker in v.lower() for marker in time_markers):
+            raise ValueError("Question must contain a time reference")
         
-        # Case-insensitive time marker check
-        question_lower = question.lower()
-        has_time = any(marker in question_lower for marker in time_markers)
-        
-        if not (has_number and has_entities and has_time):
-            print(f"Validation details: numbers={has_number}, entities={has_entities}, time={has_time}")
-            print(f"Question: {question}")
+        # Must contain a capitalized entity
+        words = v.split()
+        if not any(word[0].isupper() and len(word) > 1 for word in words):
+            raise ValueError("Question must contain a named entity")
             
-        return has_number and has_entities and has_time 
+        return v
+
+class QuestionGenerator:
+    def __init__(self):  # Remove api_key parameter
+        self.templates = {
+            'cricket': [
+                "Will {team} score {runs} runs against {opponent} {time}?",
+                "Can {player} take {wickets} wickets in the match {time}?",
+                "Will {team} win by {runs} runs {time}?"
+            ],
+            'football': [
+                "Will {team} score {goals} goals against {opponent} {time}?",
+                "Can {player} score in the first {minutes} minutes {time}?",
+                "Will {team} win with a {goals}-goal margin {time}?"
+            ],
+            'technology': [
+                "Will {company}'s stock rise by {percent}% {time}?",
+                "Can {product} reach {users} million users by {time}?",
+                "Will {company} launch {product} {time}?",
+                "Can {company} fix {number} major bugs in their {product} {time}?"
+            ],
+            'sports': [
+                "Will {team} win against {opponent} by {points} points {time}?",
+                "Can {player} break the {record} record {time}?",
+                "Will {team} qualify for {tournament} {time}?"
+            ],
+            'politics': [
+                "Will {politician} win {percent}% votes in {region} {time}?",
+                "Can {bill} get {number} votes in parliament {time}?",
+                "Will {policy} affect {number} million citizens {time}?",
+                "Can {party} form government in {region} {time}?"
+            ]
+        }
+        
+        # Entity data for template filling
+        self.entities = {
+            'cricket': {
+                'team': ['India', 'Australia', 'England', 'South Africa'],
+                'player': ['Kohli', 'Smith', 'Root', 'Williamson'],
+                'runs': [200, 250, 300, 350],
+                'wickets': [3, 4, 5, 6],
+                'opponent': ['Pakistan', 'New Zealand', 'West Indies', 'Sri Lanka']
+            },
+            'football': {
+                'team': ['Manchester United', 'Liverpool', 'Barcelona', 'Real Madrid'],
+                'player': ['Haaland', 'Mbappe', 'Salah', 'Kane'],
+                'goals': [2, 3, 4, 5],
+                'minutes': [30, 45, 60],
+                'opponent': ['Chelsea', 'Arsenal', 'Bayern Munich', 'PSG']
+            },
+            'technology': {
+                'company': ['Apple', 'Google', 'Microsoft', 'Meta', 'Amazon'],
+                'product': ['iPhone', 'Android', 'Windows', 'ChatGPT', 'AWS'],
+                'percent': [5, 10, 15, 20, 25],
+                'users': [1, 5, 10, 50, 100],
+                'number': [10, 20, 50, 100]
+            },
+            'sports': {
+                'team': ['Lakers', 'Warriors', 'Celtics', 'Heat'],
+                'player': ['LeBron', 'Curry', 'Djokovic', 'Nadal'],
+                'points': [10, 15, 20, 25],
+                'tournament': ['Champions League', 'World Cup', 'Olympics', 'Super Bowl'],
+                'record': ['scoring', 'assists', 'points', 'championship']
+            },
+            'politics': {
+                'politician': ['Biden', 'Trump', 'Johnson', 'Macron'],
+                'party': ['Democrats', 'Republicans', 'Labour', 'Conservative'],
+                'region': ['California', 'Texas', 'Florida', 'New York'],
+                'bill': ['Healthcare Bill', 'Tax Reform', 'Climate Act', 'Education Bill'],
+                'policy': ['Healthcare Reform', 'Tax Policy', 'Climate Policy', 'Immigration Reform'],
+                'percent': [30, 40, 50, 60],
+                'number': [1, 5, 10, 50]
+            }
+        }
+
+    def generate_question(self, articles: List[str], interest: str) -> str:
+        """Generate a prediction question based on articles and interest"""
+        try:
+            # Extract entities from articles
+            article_entities = self._extract_entities_from_articles(articles)
+            
+            # Get template and entities for the interest
+            templates = self.templates.get(interest, self.templates['sports'])  # Default to sports
+            entities = self.entities.get(interest, self.entities['sports'])
+            
+            # Merge article entities with predefined ones
+            if article_entities:
+                # Add entities to appropriate categories based on context
+                for entity in article_entities:
+                    if any(entity in v for v in entities.values()):
+                        continue  # Skip if already in our lists
+                    if entity.endswith(('Corp', 'Inc', 'Ltd')):
+                        entities['company'] = [entity] + entities.get('company', [])
+                    else:
+                        # Add to most appropriate list based on interest
+                        if interest in ['cricket', 'football', 'sports']:
+                            entities['team'] = [entity] + entities['team']
+                        elif interest == 'technology':
+                            entities['company'] = [entity] + entities.get('company', [])
+                        elif interest == 'politics':
+                            entities['politician'] = [entity] + entities.get('politician', [])
+            
+            # Generate time reference
+            time_refs = ['tomorrow', 'this weekend', 'next Saturday', 'this week']
+            time_ref = random.choice(time_refs)
+            
+            # Fill template with random entities
+            template = random.choice(templates)
+            question = template.format(
+                **{k: random.choice(v) for k, v in entities.items()},
+                time=time_ref
+            )
+            
+            # Validate using Pydantic model
+            validated_question = PredictionQuestion(
+                question_text=question,
+                interest=interest,
+                source_articles=articles
+            )
+            
+            return validated_question.question_text
+            
+        except Exception as e:
+            print(f"Error generating question: {str(e)}")
+            return self._generate_fallback_question(articles, interest)
+
+    def _extract_entities_from_articles(self, articles: List[str]) -> List[str]:
+        """Extract named entities from articles"""
+        entities = []
+        for article in articles:
+            words = article.split()
+            # Get capitalized words that are likely team/player names
+            entities.extend([w for w in words if w[0].isupper() and len(w) > 1])
+        return list(set(entities))  # Remove duplicates
+
+    def _generate_fallback_question(self, articles: List[str], interest: str) -> str:
+        """Generate a simple fallback question"""
+        entities = self.entities.get(interest, self.entities['cricket'])
+        return f"Will {random.choice(entities['team'])} win tomorrow?" 
