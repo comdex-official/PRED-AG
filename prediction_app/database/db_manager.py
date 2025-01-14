@@ -145,3 +145,10 @@ class DatabaseManager:
             question.result = result
             question.resolution_note = note
             self.session.commit() 
+
+    def update_user_interests(self, user_id: int, interests: List[str]) -> None:
+        """Update user interests"""
+        user = self.session.query(User).filter(User.id == user_id).first()
+        if user:
+            user.interests = json.dumps(interests)
+            self.session.commit() 
