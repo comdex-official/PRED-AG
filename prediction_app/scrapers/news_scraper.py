@@ -71,33 +71,21 @@ class NewsScraper:
         if domain in self.rules:
             rule = self.rules[domain]
             articles_elements = soup.select(rule["article_selector"])
+            print(f"Found {len(articles_elements)} elements matching selector for {domain}")
             
-            # Get current time for filtering
-            now = datetime.utcnow()
-            cutoff_time = now - timedelta(days=2)  # Only articles from last 2 days
-            
-            for article in articles_elements[:15]:  # Limit to first 15 articles
+            for article in articles_elements[:15]:
                 try:
                     title = article.select_one(rule["title_selector"])
                     if title:
-                        # Try to get article date if available
-                        date_element = article.select_one(rule.get("date_selector", ""))
-                        if date_element:
-                            try:
-                                article_date = self._parse_date(date_element.text)
-                                if article_date < cutoff_time:
-                                    continue
-                            except:
-                                pass  # If date parsing fails, include the article
-                        
                         text = title.get_text(strip=True)
                         if text and len(text) > 20:
                             articles.append(text)
                 except Exception as e:
-                    print(f"Error parsing article element: {str(e)}")
+                    print(f"Error parsing article: {str(e)}")
                     continue
         
-        return articles[:10]  # Return only the 10 most recent articles
+        print(f"Successfully extracted {len(articles)} articles from {domain}")
+        return articles[:10]
 
     def _scrape_reddit(self, url: str) -> List[str]:
         """Handle Reddit JSON API"""

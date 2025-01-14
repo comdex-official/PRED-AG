@@ -19,8 +19,8 @@ NEWS_SOURCES = {
     ],
     "cricket": [
         "https://www.reddit.com/r/Cricket/hot/.json",
-        "https://www.espncricinfo.com",
-        "https://www.cricbuzz.com"
+        "https://www.espncricinfo.com/latest-cricket-news",
+        "https://www.cricbuzz.com/cricket-news"
     ],
     "politics": [
         "https://www.reddit.com/r/politics/hot/.json",
@@ -49,8 +49,8 @@ SCRAPING_RULES = {
         "title_selector": "h3"
     },
     "www.espncricinfo.com": {
-        "article_selector": ".ds-border-b article",
-        "title_selector": "h2",
+        "article_selector": ".ds-py-3.ds-px-4",
+        "title_selector": "h2 a, h3 a",
         "date_selector": "time"
     },
     "www.cricbuzz.com": {
