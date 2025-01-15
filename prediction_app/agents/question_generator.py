@@ -10,13 +10,22 @@ class PredictionQuestion(BaseModel):
 
     @validator('question_text')
     def validate_question_format(cls, v):
-        # Must start with specific words
-        if not v.startswith(('Will ', 'Can ')):
-            raise ValueError("Question must start with 'Will' or 'Can'")
+        # Allow questions starting with "Who" as well
+        valid_starts = ('Will ', 'Can ', 'Who will ')
+        if not any(v.startswith(start) for start in valid_starts):
+            raise ValueError("Question must start with 'Will', 'Can', or 'Who will'")
         
-        # Must contain a number
-        if not any(char.isdigit() for char in v):
-            raise ValueError("Question must contain a number")
+        # Must contain a number, comparison, or be about multiple players
+        if not (any(char.isdigit() for char in v) or  # Has numbers
+                ('more' in v.lower() and 'than' in v.lower()) or  # Comparison
+                'both' in v.lower() or  # Multiple players
+                v.lower().startswith('who will')):  # Direct comparison
+            raise ValueError("Question must contain a number, comparison, or be about multiple players")
+        
+        # Must contain proper names (not single letters)
+        words = v.split()
+        if not any(word[0].isupper() and len(word) > 2 for word in words):
+            raise ValueError("Question must contain proper names (not single letters)")
         
         # Must contain a time reference
         time_markers = [
@@ -26,16 +35,25 @@ class PredictionQuestion(BaseModel):
         ]
         if not any(marker in v.lower() for marker in time_markers):
             raise ValueError("Question must contain a time reference")
-        
-        # Must contain a capitalized entity
-        words = v.split()
-        if not any(word[0].isupper() and len(word) > 1 for word in words):
-            raise ValueError("Question must contain a named entity")
             
         return v
 
 class QuestionGenerator:
     def __init__(self):  # Remove api_key parameter
+        # Add player patterns as class attribute
+        self.player_patterns = [
+            # Common cricket roles
+            'batsman', 'bowler', 'all-rounder', 'keeper', 'captain',
+            # Common football positions
+            'striker', 'forward', 'midfielder', 'defender', 'goalkeeper',
+            # Action verbs
+            'scored', 'hits', 'takes', 'saves', 'plays', 'shoots',
+            # Statistics
+            'goals', 'assists', 'runs', 'wickets', 'catches',
+            # Status words
+            'injured', 'fit', 'available', 'selected', 'starting'
+        ]
+
         self.templates = {
             'cricket': [
                 "Will {team} score {runs} runs against {opponent} {time}?",
@@ -54,7 +72,7 @@ class QuestionGenerator:
                 "Who will score first: {player} or {opponent_player} {time}?",
                 "Will {player} score more goals than {opponent_player} {time}?",
                 "Can {player} get more assists than {opponent_player} {time}?",
-                "Will both {player} and {opponent_player} score {time}?",
+                "Will both {player} and {opponent_player} score {goals} goals {time}?",
                 "Who will have more shots on target: {player} or {opponent_player} {time}?"
             ],
             'technology': [
@@ -152,40 +170,64 @@ class QuestionGenerator:
     def generate_question(self, articles: List[str], interest: str) -> str:
         """Generate a prediction question based on articles and interest"""
         try:
-            # Extract and validate entities from articles
+            # Extract entities with improved classification
             article_entities = self._extract_entities_from_articles(articles)
-            validated_entities = [
-                entity for entity in article_entities 
-                if self._validate_entity_for_interest(entity, interest)
-            ]
             
-            # Get template and entities for the interest
+            # Get base templates and entities
             templates = self.templates.get(interest, self.templates['sports'])
             entities = self.entities.get(interest, self.entities['sports'])
             
-            # Merge article entities with predefined ones
-            if validated_entities:
-                for entity in validated_entities:
-                    if any(entity in v for v in entities.values()):
-                        continue  # Skip if already in our lists
-                    if interest in ['cricket', 'football', 'sports']:
-                        if len(entity.split()) >= 2:  # Prefer full team names
-                            entities['team'] = [entity] + entities['team']
-                    elif interest == 'technology':
-                        if any(suffix in entity for suffix in ['Inc', 'Corp', 'Tech']):
-                            entities['company'] = [entity] + entities.get('company', [])
-                    elif interest == 'politics':
-                        if len(entity.split()) <= 2:  # Names are usually 1-2 words
-                            entities['politician'] = [entity] + entities.get('politician', [])
+            # Update entities with extracted ones
+            if article_entities['players']:
+                # Split players between main and opponent lists
+                new_players = list(article_entities['players'])
+                random.shuffle(new_players)
+                mid = len(new_players) // 2
+                
+                if interest in ['cricket', 'football', 'sports']:
+                    entities['player'] = new_players[:mid] + entities['player']
+                    entities['opponent_player'] = new_players[mid:] + entities['opponent_player']
+            
+            if article_entities['teams']:
+                if interest in ['cricket', 'football', 'sports']:
+                    entities['team'] = list(article_entities['teams']) + entities['team']
+                    entities['opponent'] = list(article_entities['teams']) + entities['opponent']
+            
+            # Choose template and ensure different players/teams for comparison
+            template = random.choice(templates)
+            if '{opponent_player}' in template:
+                valid_players = [p for p in entities['player'] if len(p) > 2]
+                valid_opponents = [p for p in entities['opponent_player'] if len(p) > 2]
+                
+                if not valid_players or not valid_opponents:
+                    # Fall back to predefined players
+                    valid_players = self.entities[interest]['player']
+                    valid_opponents = self.entities[interest]['opponent_player']
+                
+                player = random.choice(valid_players)
+                opponent_player = random.choice([p for p in valid_opponents if p != player])
+                entities = {**entities, 'player': player, 'opponent_player': opponent_player}
+            
+            if '{team}' in template and '{opponent}' in template:
+                valid_teams = [t for t in entities['team'] if len(t) > 2]
+                valid_opponents = [t for t in entities['opponent'] if len(t) > 2]
+                
+                if not valid_teams or not valid_opponents:
+                    valid_teams = self.entities[interest]['team']
+                    valid_opponents = self.entities[interest]['opponent']
+                
+                team = random.choice(valid_teams)
+                opponent = random.choice([t for t in valid_opponents if t != team])
+                entities = {**entities, 'team': team, 'opponent': opponent}
 
             # Generate time reference
             time_refs = ['tomorrow', 'this weekend', 'next Saturday', 'this week']
             time_ref = random.choice(time_refs)
             
-            # Fill template with random entities
-            template = random.choice(templates)
+            # Fill template with validated entities
             question = template.format(
-                **{k: random.choice(v) for k, v in entities.items()},
+                **{k: (random.choice(v) if isinstance(v, list) else v) 
+                   for k, v in entities.items()},
                 time=time_ref
             )
             
@@ -202,21 +244,65 @@ class QuestionGenerator:
             print(f"Error generating question: {str(e)}")
             return self._generate_fallback_question(articles, interest)
 
-    def _extract_entities_from_articles(self, articles: List[str]) -> List[str]:
-        """Extract named entities from articles with improved filtering"""
-        entities = []
-        for article in articles:
-            words = article.split()
-            # Get capitalized words with better filtering
-            for word in words:
-                if (word[0].isupper() and  # Must start with capital letter
-                    len(word) > 1 and      # Must be longer than 1 character
-                    word.lower() not in self.filter_words and  # Not in filter list
-                    not any(char.isdigit() for char in word) and  # No digits
-                    not any(char in '.,!?;:' for char in word)):  # No punctuation
-                    entities.append(word)
+    def _extract_entities_from_articles(self, articles: List[str]) -> dict:
+        """Extract named entities from articles with improved player and team detection"""
+        entities = {
+            'players': set(),
+            'teams': set(),
+            'tournaments': set()
+        }
         
-        return list(set(entities))  # Remove duplicates
+        # Common team indicators and prefixes
+        team_indicators = {'FC', 'United', 'City', 'Team', 'XI', 'Cricket'}
+        team_prefixes = {'Real', 'Manchester', 'Inter', 'AC', 'Bayern', 'Borussia'}
+        tournament_indicators = {'League', 'Cup', 'Series', 'Championship', 'Trophy'}
+        
+        # Minimum length requirements
+        MIN_TEAM_LENGTH = 3  # Minimum characters for team name
+        MIN_PLAYER_LENGTH = 4  # Minimum characters for player name
+        
+        for article in articles:
+            sentences = article.split('.')
+            for sentence in sentences:
+                words = sentence.split()
+                
+                # Look for capitalized words
+                for i, word in enumerate(words):
+                    if (word[0].isupper() and 
+                        len(word) > 1 and 
+                        word.lower() not in self.filter_words):
+                        
+                        # Check if it's part of a multi-word name
+                        name_parts = [word]
+                        next_idx = i + 1
+                        while (next_idx < len(words) and 
+                               words[next_idx][0].isupper() and 
+                               len(words[next_idx]) > 1):
+                            name_parts.append(words[next_idx])
+                            next_idx += 1
+                        
+                        full_name = ' '.join(name_parts)
+                        
+                        # Skip if name is too short
+                        if len(full_name) < MIN_TEAM_LENGTH:
+                            continue
+                        
+                        # Classify the entity
+                        if (any(indicator in full_name for indicator in team_indicators) or
+                            any(full_name.startswith(prefix) for prefix in team_prefixes)):
+                            if len(full_name) >= MIN_TEAM_LENGTH:
+                                entities['teams'].add(full_name)
+                        elif any(indicator in full_name for indicator in tournament_indicators):
+                            entities['tournaments'].add(full_name)
+                        else:
+                            # Check context for player detection
+                            context = ' '.join(words[max(0, i-3):min(len(words), i+4)]).lower()
+                            if (len(full_name) >= MIN_PLAYER_LENGTH and
+                                (any(pattern in context for pattern in self.player_patterns) or
+                                 len(name_parts) >= 2)):  # Most player names have at least two parts
+                                entities['players'].add(full_name)
+
+        return entities
 
     def _validate_entity_for_interest(self, entity: str, interest: str) -> bool:
         """Validate if an entity is appropriate for the given interest"""
