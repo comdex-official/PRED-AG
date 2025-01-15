@@ -30,14 +30,14 @@ class Question(Base):
     __tablename__ = 'questions'
 
     id = Column(Integer, primary_key=True)
-    question_text = Column(Text, nullable=False)
-    interest = Column(String(50), nullable=False)
-    source_articles = Column(Text)  # Stored as JSON string
+    question_text = Column(String, nullable=False)
+    interest = Column(String, nullable=False)
+    source_articles = Column(String, nullable=False)  # JSON string of article URLs
+    source_links = Column(String, nullable=False)  # JSON string of source links
     created_at = Column(DateTime, default=datetime.utcnow)
-    resolution_date = Column(DateTime)  # When the question should be resolved
-    status = Column(String(20), default='pending')  # pending, resolved, expired
-    result = Column(Boolean, nullable=True)  # True=Yes, False=No, None=Unresolved
-    resolution_note = Column(Text)  # Optional explanation of the result
+    resolved_at = Column(DateTime, nullable=True)
+    outcome = Column(Boolean, nullable=True)
+    resolution_note = Column(String, nullable=True)
 
     def __repr__(self):
         return f"<Question(interest='{self.interest}', question='{self.question_text[:50]}...'>"

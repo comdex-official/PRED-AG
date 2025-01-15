@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 import json
 from datetime import datetime, timedelta
 from .models import Session, Question, User, user_questions
@@ -227,3 +227,35 @@ class DatabaseManager:
         except SQLAlchemyError as e:
             print(f"Database error: {str(e)}")
             return []
+
+    def create_question(self, question_text: str, interest: str, 
+                       source_articles: List[str], source_links: List[str]) -> int:
+        """Create a new question and return its ID"""
+        question = Question(
+            question_text=question_text,
+            interest=interest,
+            source_articles=json.dumps(source_articles),
+            source_links=json.dumps(source_links)
+        )
+        self.session.add(question)
+        self.session.commit()
+        return question.id
+
+    def get_questions(self, interest: str = None) -> List[Dict]:
+        """Get all questions, optionally filtered by interest"""
+        query = self.session.query(Question)
+        if interest:
+            query = query.filter(Question.interest == interest)
+            
+        questions = query.all()
+        return [{
+            'id': q.id,
+            'question': q.question_text,
+            'interest': q.interest,
+            'source_articles': json.loads(q.source_articles),
+            'source_links': json.loads(q.source_links),
+            'created_at': q.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'resolved_at': q.resolved_at.strftime('%Y-%m-%d %H:%M:%S') if q.resolved_at else None,
+            'outcome': q.outcome,
+            'resolution_note': q.resolution_note
+        } for q in questions]

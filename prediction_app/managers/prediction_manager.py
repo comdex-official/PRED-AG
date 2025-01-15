@@ -3,6 +3,7 @@ import datetime
 import random
 from functools import lru_cache
 import time
+import json
 
 from ..scrapers.news_scraper import NewsScraper
 from ..agents.question_generator import QuestionGenerator
@@ -11,9 +12,9 @@ from ..config.config import QUESTION_CONFIG
 
 class PredictionManager:
     def __init__(self, username: str):
+        self.username = username
         self.scraper = NewsScraper()
         self.generator = QuestionGenerator()
-        self.interests = set()
         self.db_manager = DatabaseManager()
         
         # Get or create user
@@ -23,6 +24,7 @@ class PredictionManager:
             self.interests = set(user['interests'])
         else:
             self.user_id = self.db_manager.create_user(username, [])
+            self.interests = set()
 
     def add_user_interest(self, interest: str) -> None:
         """Add a new interest to user's preferences"""
@@ -33,65 +35,52 @@ class PredictionManager:
         """Cache scraped results for an hour"""
         return self.scraper.scrape_news(interest)
 
-    def get_fresh_questions(self, count: int = None) -> dict:
-        """Get multiple fresh questions"""
-        if count is None:
-            count = QUESTION_CONFIG["default_count"]
-        
-        if not self.interests:
-            return {"error": "No interests added"}
-        
-        results = []
-        used_interests = set()
-        
-        while len(results) < count:
-            # Try to use different interests for variety
-            available_interests = list(self.interests - used_interests) or list(self.interests)
-            interest = random.choice(available_interests)
-            used_interests.add(interest)
+    def get_fresh_questions(self, count: int = 5) -> dict:
+        """Get fresh questions for user's interests"""
+        try:
+            user = self.db_manager.get_user(self.username)
+            if not user:
+                return {"error": "User not found"}
             
-            # First try to get unused questions from the database
-            unused_questions = self.db_manager.get_multiple_unused_questions(
-                interest, 
-                self.user_id, 
-                count=count-len(results)
+            interests = user['interests']
+            if not interests:
+                return {"error": "No interests defined for user"}
+            
+            # Pick a random interest from user's interests
+            interest = random.choice(interests)
+            
+            # Get articles using scraper
+            articles = self.scraper.scrape_news(interest)
+            
+            # Since articles are strings, create simple URLs as sources
+            sources = [f"https://news.source/{i}" for i in range(len(articles))]
+            
+            if not articles:
+                return {"error": f"No articles found for {interest}"}
+            
+            # Generate questions - pass articles directly since they're already strings
+            questions = self.generator.generate_multiple_questions(
+                articles=articles,
+                sources=sources,
+                interest=interest,
+                count=count
             )
             
-            for q in unused_questions:
-                self.db_manager.mark_question_as_viewed(q['id'], self.user_id)
-                results.append({
-                    "question": q['question'],
-                    "source_articles": q['source_articles'],
-                    "interest": interest,
-                    "source": "database"
-                })
+            # Format questions for JSON response
+            formatted_questions = [
+                {
+                    "question": q["question"],
+                    "sources": q["sources"]
+                } for q in questions
+            ]
             
-            # If we still need more questions, generate new ones
-            if len(results) < count:
-                articles = self.scraper.scrape_news(interest)
-                if articles:
-                    new_questions = self.generator.generate_multiple_questions(
-                        articles, 
-                        interest,
-                        count=count-len(results)
-                    )
-                    
-                    for question in new_questions:
-                        # Save to database and mark as viewed
-                        question_id = self.db_manager.save_question(question, interest, articles)
-                        self.db_manager.mark_question_as_viewed(question_id, self.user_id)
-                        
-                        results.append({
-                            "question": question,
-                            "source_articles": articles,
-                            "interest": interest,
-                            "source": "generated"
-                        })
-        
-        return {
-            "questions": results,
-            "count": len(results)
-        }
+            return {
+                "questions": formatted_questions,
+                "interest": interest
+            }
+            
+        except Exception as e:
+            return {"error": str(e)}
 
     def get_question_history(self, interest: Optional[str] = None) -> List[dict]:
         """Get question history for this user"""

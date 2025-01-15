@@ -109,4 +109,20 @@ async def resolve_question(
         manager.resolve_question(question_id, resolution.result, resolution.note)
         return {"message": "Question resolved successfully"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) 
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/questions/{interest}")
+async def get_questions(interest: str):
+    questions = db_manager.get_questions(interest)
+    return {
+        "questions": [{
+            "id": q["id"],
+            "question": q["question"],
+            "interest": q["interest"],
+            "sources": q["source_links"],  # Include source links in response
+            "created_at": q["created_at"],
+            "resolved_at": q["resolved_at"],
+            "outcome": q["outcome"],
+            "resolution_note": q["resolution_note"]
+        } for q in questions]
+    } 

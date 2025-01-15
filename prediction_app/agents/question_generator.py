@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from pydantic import BaseModel, Field, validator
 import random
 
@@ -7,6 +7,7 @@ class PredictionQuestion(BaseModel):
     question_text: str = Field(..., min_length=20, max_length=150)
     interest: str
     source_articles: List[str]
+    source_links: List[str]
 
     @validator('question_text')
     def validate_question_format(cls, v):
@@ -15,13 +16,22 @@ class PredictionQuestion(BaseModel):
         if not any(v.startswith(start) for start in valid_starts):
             raise ValueError("Question must start with 'Will', 'Can', or 'Who will'")
         
-        # Must contain a number, comparison, be about multiple players, or be about policy/government
-        if not (any(char.isdigit() for char in v) or  # Has numbers
-                ('more' in v.lower() and 'than' in v.lower()) or  # Comparison
-                'both' in v.lower() or  # Multiple players
-                v.lower().startswith('who will') or  # Direct comparison
-                any(word in v.lower() for word in  # Policy/government related
-                    ['policy', 'bill', 'government', 'implement'])):
+        # Must contain either:
+        # 1. Numbers
+        # 2. Comparisons (higher, more, better)
+        # 3. Policy-related terms
+        # 4. Direct comparisons between entities
+        if not (
+            any(char.isdigit() for char in v) or  # Has numbers
+            any(term in v.lower() for term in [
+                'more', 'higher', 'better', 'greater',  # Comparisons
+                'policy', 'bill', 'government', 'implement',  # Policy terms
+                'than', 'versus', 'vs',  # Direct comparisons
+                'first', 'before', 'lead'  # Temporal/ranking comparisons
+            ]) or
+            'both' in v.lower() or  # Multiple entity questions
+            v.lower().startswith('who will')  # Direct comparison questions
+        ):
             raise ValueError("Question must contain a number, comparison, or be about policy/government")
         
         # Must contain proper names (not single letters)
@@ -209,7 +219,7 @@ class QuestionGenerator:
             'government', 'congress', 'senate', 'house', 'committee'
         }
 
-    def generate_question(self, articles: List[str], interest: str) -> str:
+    def generate_question(self, articles: List[str], sources: List[str], interest: str) -> Dict:
         """Generate a prediction question based on articles and interest"""
         try:
             # Extract entities with improved classification
@@ -277,14 +287,22 @@ class QuestionGenerator:
             validated_question = PredictionQuestion(
                 question_text=question,
                 interest=interest,
-                source_articles=articles
+                source_articles=articles,
+                source_links=sources
             )
             
-            return validated_question.question_text
+            return {
+                'question': validated_question.question_text,
+                'sources': sources
+            }
             
         except Exception as e:
             print(f"Error generating question: {str(e)}")
-            return self._generate_fallback_question(articles, interest)
+            fallback = self._generate_fallback_question(articles, interest)
+            return {
+                'question': fallback,
+                'sources': sources[:1] if sources else []  # Include at least one source if available
+            }
 
     def _extract_entities_from_articles(self, articles: List[str]) -> dict:
         """Extract named entities from articles with improved player and team detection"""
@@ -371,19 +389,20 @@ class QuestionGenerator:
         else:
             return f"Will {random.choice(entities['team'])} win tomorrow?"
 
-    def generate_multiple_questions(self, articles: List[str], interest: str, count: int = 5) -> List[str]:
+    def generate_multiple_questions(self, articles: List[str], sources: List[str], 
+                                  interest: str, count: int = 5) -> List[Dict]:
         """Generate multiple prediction questions based on articles and interest"""
         questions = []
         attempts = 0
-        max_attempts = count * 2  # Allow some extra attempts for validation failures
+        max_attempts = count * 2
         
         while len(questions) < count and attempts < max_attempts:
             try:
-                question = self.generate_question(articles, interest)
-                if question not in questions:  # Avoid duplicates
+                question = self.generate_question(articles, sources, interest)
+                if question['question'] not in [q['question'] for q in questions]:
                     questions.append(question)
             except Exception as e:
                 print(f"Failed to generate question: {str(e)}")
             attempts += 1
         
-        return questions[:count]  # Return exactly count questions 
+        return questions[:count] 
