@@ -5,8 +5,10 @@ import os
 from prediction_app.config.config import QUESTION_CONFIG  # This will load env vars
 from ..managers.prediction_manager import PredictionManager
 from fastapi.middleware.cors import CORSMiddleware
+from ..database.db_manager import DatabaseManager
 
 app = FastAPI(title="Prediction Questions API")
+db_manager = DatabaseManager()
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,7 +93,14 @@ async def get_question_history(
     manager: PredictionManager = Depends(get_manager)
 ):
     """Get question history for a user"""
-    return manager.get_question_history(interest)
+    try:
+        history = manager.get_question_history(interest)
+        return {
+            "history": history,
+            "count": len(history)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/questions/pending/")
 async def get_pending_resolutions(manager: PredictionManager = Depends(get_manager)):
@@ -113,16 +122,22 @@ async def resolve_question(
 
 @app.get("/questions/{interest}")
 async def get_questions(interest: str):
-    questions = db_manager.get_questions(interest)
-    return {
-        "questions": [{
-            "id": q["id"],
-            "question": q["question"],
-            "interest": q["interest"],
-            "sources": q["source_links"],  # Include source links in response
-            "created_at": q["created_at"],
-            "resolved_at": q["resolved_at"],
-            "outcome": q["outcome"],
-            "resolution_note": q["resolution_note"]
-        } for q in questions]
-    } 
+    try:
+        questions = db_manager.get_questions(interest)
+        if not questions:
+            return {"questions": [], "message": "No questions found"}
+            
+        return {
+            "questions": [{
+                "id": q["id"],
+                "question": q["question_text"],
+                "interest": q["interest"],
+                "sources": q["source_links"],
+                "created_at": q["created_at"],
+                "resolved_at": q["resolved_at"],
+                "outcome": q["outcome"],
+                "resolution_note": q["resolution_note"]
+            } for q in questions]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 

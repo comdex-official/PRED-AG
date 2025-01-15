@@ -85,26 +85,26 @@ class DatabaseManager:
 
     def get_user_question_history(self, user_id: int, interest: Optional[str] = None) -> List[dict]:
         """Get questions viewed by a specific user"""
-        query = self.session.query(Question, user_questions.c.viewed_at)\
-            .join(user_questions)\
-            .filter(user_questions.c.user_id == user_id)
+        try:
+            query = self.session.query(Question, user_questions.c.viewed_at)\
+                .join(user_questions)\
+                .filter(user_questions.c.user_id == user_id)
             
-        if interest:
-            query = query.filter(Question.interest == interest)
+            if interest:
+                query = query.filter(Question.interest == interest)
             
-        results = query.order_by(user_questions.c.viewed_at.desc()).all()
-        
-        return [{
-            'id': q.Question.id,
-            'question': q.Question.question_text,
-            'interest': q.Question.interest,
-            'source_articles': json.loads(q.Question.source_articles),
-            'viewed_at': q.viewed_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'created_at': q.Question.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'status': q.Question.status,
-            'result': q.Question.result,
-            'resolution_note': q.Question.resolution_note
-        } for q in results] 
+            results = query.order_by(user_questions.c.viewed_at.desc()).all()
+            
+            return [{
+                'id': q.Question.id,
+                'question': q.Question.question_text,
+                'interest': q.Question.interest,
+                'source_articles': json.loads(q.Question.source_articles),
+                'viewed_at': q.viewed_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'created_at': q.Question.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            } for q in results]
+        except Exception as e:
+            return []
 
     def save_question(self, question_text: str, interest: str, source_articles: List[str]) -> int:
         """Save a question with resolution date"""
@@ -141,11 +141,10 @@ class DatabaseManager:
         return now + timedelta(days=7)
 
     def get_pending_resolutions(self) -> List[dict]:
-        """Get questions that need resolution (past resolution_date and still pending)"""
+        """Get questions that need resolution (not yet resolved)"""
         now = datetime.utcnow()
         questions = self.session.query(Question)\
-            .filter(Question.status == 'pending')\
-            .filter(Question.resolution_date <= now)\
+            .filter(Question.resolved_at.is_(None))\
             .all()
             
         return [{
@@ -153,13 +152,13 @@ class DatabaseManager:
             'question': q.question_text,
             'interest': q.interest,
             'created_at': q.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'resolution_date': q.resolution_date.strftime('%Y-%m-%d %H:%M:%S')
+            'source_articles': json.loads(q.source_articles),
+            'source_links': json.loads(q.source_links)
         } for q in questions]
 
     def resolve_question(self, question_id: int, result: bool, note: str = None) -> None:
         """Resolve question with input validation"""
         try:
-            # Validate inputs
             if not isinstance(question_id, int):
                 raise ValueError("Invalid question_id type")
             if not isinstance(result, bool):
@@ -169,8 +168,8 @@ class DatabaseManager:
             
             question = self.session.query(Question).get(question_id)
             if question:
-                question.status = 'resolved'
-                question.result = result
+                question.resolved_at = datetime.utcnow()
+                question.outcome = result
                 question.resolution_note = note
                 self.session.commit()
         except SQLAlchemyError as e:

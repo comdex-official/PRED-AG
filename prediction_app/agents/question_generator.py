@@ -376,7 +376,7 @@ class QuestionGenerator:
         elif interest == 'technology':
             tech_indicators = {'Inc', 'Corp', 'Technologies', 'Software', 'Tech'}
             return any(word in entity for word in tech_indicators)
-        return True
+        return True 
 
     def _generate_fallback_question(self, articles: List[str], interest: str) -> str:
         """Generate a simple fallback question based on interest"""

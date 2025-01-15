@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, B
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+from prediction_app.config.loader import get_database_url
 
 Base = declarative_base()
 
@@ -42,7 +43,14 @@ class Question(Base):
     def __repr__(self):
         return f"<Question(interest='{self.interest}', question='{self.question_text[:50]}...'>"
 
-# Create database engine and session
-engine = create_engine('sqlite:///prediction_questions.db')
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine) 
+# Create database engine with error handling
+try:
+    DATABASE_URL = get_database_url()
+    engine = create_engine(DATABASE_URL, echo=True)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+except Exception as e:
+    sqlite_url = "sqlite:///prediction_questions.db"
+    engine = create_engine(sqlite_url)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine) 

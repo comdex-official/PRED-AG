@@ -4,11 +4,14 @@ import random
 from functools import lru_cache
 import time
 import json
+import logging
 
 from ..scrapers.news_scraper import NewsScraper
 from ..agents.question_generator import QuestionGenerator
 from ..database.db_manager import DatabaseManager
 from ..config.config import QUESTION_CONFIG
+
+logger = logging.getLogger(__name__)
 
 class PredictionManager:
     def __init__(self, username: str):
@@ -46,19 +49,13 @@ class PredictionManager:
             if not interests:
                 return {"error": "No interests defined for user"}
             
-            # Pick a random interest from user's interests
             interest = random.choice(interests)
-            
-            # Get articles using scraper
             articles = self.scraper.scrape_news(interest)
-            
-            # Since articles are strings, create simple URLs as sources
             sources = [f"https://news.source/{i}" for i in range(len(articles))]
             
             if not articles:
                 return {"error": f"No articles found for {interest}"}
             
-            # Generate questions - pass articles directly since they're already strings
             questions = self.generator.generate_multiple_questions(
                 articles=articles,
                 sources=sources,
@@ -66,16 +63,21 @@ class PredictionManager:
                 count=count
             )
             
-            # Format questions for JSON response
-            formatted_questions = [
-                {
-                    "question": q["question"],
-                    "sources": q["sources"]
-                } for q in questions
-            ]
+            # Save questions to database and mark as viewed
+            saved_questions = []
+            for q in questions:
+                question_id = self.db_manager.create_question(
+                    question_text=q["question"],
+                    interest=interest,
+                    source_articles=articles,
+                    source_links=q["sources"]
+                )
+                # Mark question as viewed by this user
+                self.db_manager.mark_question_as_viewed(question_id, self.user_id)
+                saved_questions.append(q)
             
             return {
-                "questions": formatted_questions,
+                "questions": saved_questions,
                 "interest": interest
             }
             
@@ -84,7 +86,10 @@ class PredictionManager:
 
     def get_question_history(self, interest: Optional[str] = None) -> List[dict]:
         """Get question history for this user"""
-        return self.db_manager.get_user_question_history(self.user_id, interest)
+        try:
+            return self.db_manager.get_user_question_history(self.user_id, interest)
+        except Exception as e:
+            return []
 
     def reset_used_questions(self, interest: Optional[str] = None) -> None:
         """Reset the 'used' flag for questions, optionally for a specific interest"""
