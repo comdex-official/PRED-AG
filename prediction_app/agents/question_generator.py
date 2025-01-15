@@ -76,10 +76,25 @@ class QuestionGenerator:
                 "Who will have more shots on target: {player} or {opponent_player} {time}?"
             ],
             'technology': [
-                "Will {company}'s stock rise by {percent}% {time}?",
-                "Can {product} reach {users} million users by {time}?",
+                # Product/Service Metrics
+                "Will {company} reach {users} million users for {product} {time}?",
+                "Can {product} achieve {percent}% market share {time}?",
+                "Will {company}'s {product} revenue grow by {percent}% {time}?",
+                
+                # Product Launches
                 "Will {company} launch {product} {time}?",
-                "Can {company} fix {number} major bugs in their {product} {time}?"
+                "Can {company} release {product} before {opponent_company} {time}?",
+                "Will both {company} and {opponent_company} release their {category} products {time}?",
+                
+                # Technical Achievements
+                "Can {company} fix {number} critical bugs in {product} {time}?",
+                "Will {company}'s AI model outperform {opponent_company}'s {time}?",
+                "Can {product} process {number} million transactions {time}?",
+                
+                # Market Competition
+                "Will {company} acquire more startups than {opponent_company} {time}?",
+                "Can {company} maintain its lead over {opponent_company} in {category} {time}?",
+                "Will {company}'s stock outperform {opponent_company}'s {time}?"
             ],
             'sports': [
                 "Will {team} win against {opponent} by {points} points {time}?",
@@ -87,10 +102,25 @@ class QuestionGenerator:
                 "Will {team} qualify for {tournament} {time}?"
             ],
             'politics': [
-                "Will {politician} win {percent}% votes in {region} {time}?",
+                # Election/Voting
+                "Will {politician} get {percent}% approval rating {time}?",
+                "Can {politician} win {percent}% votes in {region} {time}?",
+                "Will {party} secure {number} seats in {region} {time}?",
+                
+                # Legislative Process
                 "Can {bill} get {number} votes in parliament {time}?",
+                "Will {policy} be implemented in {region} {time}?",
+                "Can {politician} pass more bills than {opponent_politician} {time}?",
+                
+                # Political Competition
+                "Will {politician} have higher approval ratings than {opponent_politician} {time}?",
+                "Can {party} form government in {region} {time}?",
+                "Will both {politician} and {opponent_politician} participate in {event} {time}?",
+                
+                # Policy Impact
                 "Will {policy} affect {number} million citizens {time}?",
-                "Can {party} form government in {region} {time}?"
+                "Can {politician} reduce {metric} by {percent}% in {region} {time}?",
+                "Will {party}'s {policy} get more support than {opponent_party}'s {time}?"
             ]
         }
         
@@ -130,11 +160,13 @@ class QuestionGenerator:
                 'opponent': ['Chelsea', 'Arsenal', 'Bayern Munich', 'PSG']
             },
             'technology': {
-                'company': ['Apple', 'Google', 'Microsoft', 'Meta', 'Amazon'],
-                'product': ['iPhone', 'Android', 'Windows', 'ChatGPT', 'AWS'],
-                'percent': [5, 10, 15, 20, 25],
+                'company': ['Apple', 'Google', 'Microsoft', 'Meta', 'Amazon', 'Tesla', 'NVIDIA'],
+                'opponent_company': ['Samsung', 'OpenAI', 'IBM', 'Oracle', 'Intel', 'AMD'],
+                'product': ['iPhone 16', 'Pixel 9', 'Windows 12', 'ChatGPT-5', 'Tesla Model 3'],
+                'category': ['AI', 'Cloud', '5G', 'VR', 'Quantum Computing', 'Electric Vehicles'],
+                'percent': [5, 10, 15, 20, 25, 30],
                 'users': [1, 5, 10, 50, 100],
-                'number': [10, 20, 50, 100]
+                'number': [10, 20, 50, 100, 500]
             },
             'sports': {
                 'team': ['Lakers', 'Warriors', 'Celtics', 'Heat'],
@@ -144,11 +176,15 @@ class QuestionGenerator:
                 'record': ['scoring', 'assists', 'points', 'championship']
             },
             'politics': {
-                'politician': ['Biden', 'Trump', 'Johnson', 'Macron'],
-                'party': ['Democrats', 'Republicans', 'Labour', 'Conservative'],
-                'region': ['California', 'Texas', 'Florida', 'New York'],
+                'politician': ['Biden', 'Trump', 'Harris', 'DeSantis', 'Newsom', 'McConnell'],
+                'opponent_politician': ['Sanders', 'Warren', 'Cruz', 'Pelosi', 'McCarthy'],
+                'party': ['Democrats', 'Republicans', 'Progressives', 'Conservatives'],
+                'opponent_party': ['GOP', 'Democratic Party', 'Liberal Party', 'Labor Party'],
+                'region': ['California', 'Texas', 'Florida', 'New York', 'Washington'],
                 'bill': ['Healthcare Bill', 'Tax Reform', 'Climate Act', 'Education Bill'],
                 'policy': ['Healthcare Reform', 'Tax Policy', 'Climate Policy', 'Immigration Reform'],
+                'event': ['Debate', 'Town Hall', 'Campaign Rally', 'Press Conference'],
+                'metric': ['Unemployment', 'Inflation', 'Crime Rate', 'Carbon Emissions'],
                 'percent': [30, 40, 50, 60],
                 'number': [1, 5, 10, 50]
             }
@@ -164,7 +200,11 @@ class QuestionGenerator:
             'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
             # Common words that might be capitalized
             'The', 'A', 'An', 'And', 'Or', 'But', 'For', 'With', 'In', 'On', 'At',
-            'To', 'By', 'From', 'Up', 'Down', 'Over', 'Under'
+            'To', 'By', 'From', 'Up', 'Down', 'Over', 'Under',
+            # Tech terms
+            'software', 'hardware', 'platform', 'system', 'device', 'app',
+            # Political terms
+            'government', 'congress', 'senate', 'house', 'committee'
         }
 
     def generate_question(self, articles: List[str], interest: str) -> str:
