@@ -226,4 +226,4 @@ class DatabaseManager:
             } for q in questions]
         except SQLAlchemyError as e:
             print(f"Database error: {str(e)}")
-            return [] 
+            return []
