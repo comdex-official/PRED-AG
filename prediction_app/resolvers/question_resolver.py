@@ -6,6 +6,7 @@ import spacy
 import re
 from ..database.db_manager import DatabaseManager
 from ..config.config import RESOLVER_CONFIG
+import os
 
 class QuestionResolver:
     def __init__(self):
