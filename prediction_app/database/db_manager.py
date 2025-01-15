@@ -152,3 +152,24 @@ class DatabaseManager:
         if user:
             user.interests = json.dumps(interests)
             self.session.commit() 
+
+    def get_multiple_unused_questions(self, interest: str, user_id: int, count: int = 5) -> List[dict]:
+        """Get multiple random questions that haven't been shown to this user"""
+        subquery = self.session.query(user_questions.c.question_id)\
+            .filter(user_questions.c.user_id == user_id)\
+            .subquery()
+            
+        questions = self.session.query(Question)\
+            .filter(Question.interest == interest)\
+            .filter(~Question.id.in_(subquery))\
+            .order_by(func.random())\
+            .limit(count)\
+            .all()
+            
+        return [{
+            'id': q.id,
+            'question': q.question_text,
+            'interest': q.interest,
+            'source_articles': json.loads(q.source_articles),
+            'created_at': q.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        } for q in questions] 

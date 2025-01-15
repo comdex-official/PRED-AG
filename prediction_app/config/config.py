@@ -80,3 +80,10 @@ OPENAI_CONFIG = {
     "temperature": 0.7,
     "max_tokens": 100
 }
+
+# Question generation configuration
+QUESTION_CONFIG = {
+    "default_count": 5,
+    "min_count": 1,
+    "max_count": 10
+}

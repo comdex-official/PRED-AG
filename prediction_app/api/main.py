@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Query
 from typing import List, Optional
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 from ..managers.prediction_manager import PredictionManager
 from fastapi.middleware.cors import CORSMiddleware
+from ..config.config import QUESTION_CONFIG
 
 # Load environment variables
 load_dotenv()
@@ -74,9 +75,16 @@ async def create_user(user: User):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/questions/fresh/")
-async def get_fresh_question(manager: PredictionManager = Depends(get_manager)):
-    """Get a fresh prediction question"""
-    result = manager.get_fresh_question()
+async def get_fresh_questions(
+    count: int = Query(
+        default=QUESTION_CONFIG["default_count"],
+        ge=QUESTION_CONFIG["min_count"],
+        le=QUESTION_CONFIG["max_count"]
+    ),
+    manager: PredictionManager = Depends(get_manager)
+):
+    """Get multiple fresh prediction questions"""
+    result = manager.get_fresh_questions(count)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result

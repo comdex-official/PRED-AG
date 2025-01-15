@@ -171,3 +171,20 @@ class QuestionGenerator:
         """Generate a simple fallback question"""
         entities = self.entities.get(interest, self.entities['cricket'])
         return f"Will {random.choice(entities['team'])} win tomorrow?" 
+
+    def generate_multiple_questions(self, articles: List[str], interest: str, count: int = 5) -> List[str]:
+        """Generate multiple prediction questions based on articles and interest"""
+        questions = []
+        attempts = 0
+        max_attempts = count * 2  # Allow some extra attempts for validation failures
+        
+        while len(questions) < count and attempts < max_attempts:
+            try:
+                question = self.generate_question(articles, interest)
+                if question not in questions:  # Avoid duplicates
+                    questions.append(question)
+            except Exception as e:
+                print(f"Failed to generate question: {str(e)}")
+            attempts += 1
+        
+        return questions[:count]  # Return exactly count questions 

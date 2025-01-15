@@ -7,6 +7,7 @@ import time
 from ..scrapers.news_scraper import NewsScraper
 from ..agents.question_generator import QuestionGenerator
 from ..database.db_manager import DatabaseManager
+from ..config.config import QUESTION_CONFIG
 
 class PredictionManager:
     def __init__(self, username: str):
@@ -32,41 +33,64 @@ class PredictionManager:
         """Cache scraped results for an hour"""
         return self.scraper.scrape_news(interest)
 
-    def get_fresh_question(self) -> dict:
-        """Get a question, first trying unused ones from DB, then generating new ones"""
+    def get_fresh_questions(self, count: int = None) -> dict:
+        """Get multiple fresh questions"""
+        if count is None:
+            count = QUESTION_CONFIG["default_count"]
+        
         if not self.interests:
             return {"error": "No interests added"}
+        
+        results = []
+        used_interests = set()
+        
+        while len(results) < count:
+            # Try to use different interests for variety
+            available_interests = list(self.interests - used_interests) or list(self.interests)
+            interest = random.choice(available_interests)
+            used_interests.add(interest)
             
-        interest = random.choice(list(self.interests))
-        
-        # First try to get an unused question from the database
-        unused_question = self.db_manager.get_unused_question(interest, self.user_id)
-        if unused_question:
-            # Mark it as viewed by this user
-            self.db_manager.mark_question_as_viewed(unused_question['id'], self.user_id)
-            return {
-                "question": unused_question['question'],
-                "source_articles": unused_question['source_articles'],
-                "interest": interest,
-                "source": "database"
-            }
-        
-        # If no unused questions, generate a new one
-        articles = self.scraper.scrape_news(interest)
-        if not articles:
-            return {"error": f"No recent articles found for {interest}"}
+            # First try to get unused questions from the database
+            unused_questions = self.db_manager.get_multiple_unused_questions(
+                interest, 
+                self.user_id, 
+                count=count-len(results)
+            )
             
-        question = self.generator.generate_question(articles, interest)
-        
-        # Save to database and mark as viewed
-        question_id = self.db_manager.save_question(question, interest, articles)
-        self.db_manager.mark_question_as_viewed(question_id, self.user_id)
+            for q in unused_questions:
+                self.db_manager.mark_question_as_viewed(q['id'], self.user_id)
+                results.append({
+                    "question": q['question'],
+                    "source_articles": q['source_articles'],
+                    "interest": interest,
+                    "source": "database"
+                })
+            
+            # If we still need more questions, generate new ones
+            if len(results) < count:
+                articles = self.scraper.scrape_news(interest)
+                if articles:
+                    new_questions = self.generator.generate_multiple_questions(
+                        articles, 
+                        interest,
+                        count=count-len(results)
+                    )
+                    
+                    for question in new_questions:
+                        # Save to database and mark as viewed
+                        question_id = self.db_manager.save_question(question, interest, articles)
+                        self.db_manager.mark_question_as_viewed(question_id, self.user_id)
+                        
+                        results.append({
+                            "question": question,
+                            "source_articles": articles,
+                            "interest": interest,
+                            "source": "generated"
+                        })
         
         return {
-            "question": question,
-            "source_articles": articles,
-            "interest": interest,
-            "source": "generated"
+            "questions": results,
+            "count": len(results)
         }
 
     def get_question_history(self, interest: Optional[str] = None) -> List[dict]:
