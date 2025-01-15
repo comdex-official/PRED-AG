@@ -2,13 +2,9 @@ from fastapi import FastAPI, HTTPException, Depends, Header, Query
 from typing import List, Optional
 from pydantic import BaseModel
 import os
-from dotenv import load_dotenv
+from prediction_app.config.config import QUESTION_CONFIG  # This will load env vars
 from ..managers.prediction_manager import PredictionManager
 from fastapi.middleware.cors import CORSMiddleware
-from ..config.config import QUESTION_CONFIG
-
-# Load environment variables
-load_dotenv()
 
 app = FastAPI(title="Prediction Questions API")
 

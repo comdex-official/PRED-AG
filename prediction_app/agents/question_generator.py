@@ -107,33 +107,48 @@ class QuestionGenerator:
             }
         }
 
+        # Add common words to filter out from entity extraction
+        self.filter_words = {
+            # Months
+            'january', 'february', 'march', 'april', 'may', 'june',
+            'july', 'august', 'september', 'october', 'november', 'december',
+            'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+            # Days
+            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+            # Common words that might be capitalized
+            'The', 'A', 'An', 'And', 'Or', 'But', 'For', 'With', 'In', 'On', 'At',
+            'To', 'By', 'From', 'Up', 'Down', 'Over', 'Under'
+        }
+
     def generate_question(self, articles: List[str], interest: str) -> str:
         """Generate a prediction question based on articles and interest"""
         try:
-            # Extract entities from articles
+            # Extract and validate entities from articles
             article_entities = self._extract_entities_from_articles(articles)
+            validated_entities = [
+                entity for entity in article_entities 
+                if self._validate_entity_for_interest(entity, interest)
+            ]
             
             # Get template and entities for the interest
-            templates = self.templates.get(interest, self.templates['sports'])  # Default to sports
+            templates = self.templates.get(interest, self.templates['sports'])
             entities = self.entities.get(interest, self.entities['sports'])
             
             # Merge article entities with predefined ones
-            if article_entities:
-                # Add entities to appropriate categories based on context
-                for entity in article_entities:
+            if validated_entities:
+                for entity in validated_entities:
                     if any(entity in v for v in entities.values()):
                         continue  # Skip if already in our lists
-                    if entity.endswith(('Corp', 'Inc', 'Ltd')):
-                        entities['company'] = [entity] + entities.get('company', [])
-                    else:
-                        # Add to most appropriate list based on interest
-                        if interest in ['cricket', 'football', 'sports']:
+                    if interest in ['cricket', 'football', 'sports']:
+                        if len(entity.split()) >= 2:  # Prefer full team names
                             entities['team'] = [entity] + entities['team']
-                        elif interest == 'technology':
+                    elif interest == 'technology':
+                        if any(suffix in entity for suffix in ['Inc', 'Corp', 'Tech']):
                             entities['company'] = [entity] + entities.get('company', [])
-                        elif interest == 'politics':
+                    elif interest == 'politics':
+                        if len(entity.split()) <= 2:  # Names are usually 1-2 words
                             entities['politician'] = [entity] + entities.get('politician', [])
-            
+
             # Generate time reference
             time_refs = ['tomorrow', 'this weekend', 'next Saturday', 'this week']
             time_ref = random.choice(time_refs)
@@ -159,13 +174,34 @@ class QuestionGenerator:
             return self._generate_fallback_question(articles, interest)
 
     def _extract_entities_from_articles(self, articles: List[str]) -> List[str]:
-        """Extract named entities from articles"""
+        """Extract named entities from articles with improved filtering"""
         entities = []
         for article in articles:
             words = article.split()
-            # Get capitalized words that are likely team/player names
-            entities.extend([w for w in words if w[0].isupper() and len(w) > 1])
+            # Get capitalized words with better filtering
+            for word in words:
+                if (word[0].isupper() and  # Must start with capital letter
+                    len(word) > 1 and      # Must be longer than 1 character
+                    word.lower() not in self.filter_words and  # Not in filter list
+                    not any(char.isdigit() for char in word) and  # No digits
+                    not any(char in '.,!?;:' for char in word)):  # No punctuation
+                    entities.append(word)
+        
         return list(set(entities))  # Remove duplicates
+
+    def _validate_entity_for_interest(self, entity: str, interest: str) -> bool:
+        """Validate if an entity is appropriate for the given interest"""
+        # Add specific validation rules for each interest
+        if interest == 'cricket':
+            invalid_cricket = {'Test', 'ODI', 'T20', 'Series', 'Cup', 'Trophy', 'Match'}
+            return entity not in invalid_cricket
+        elif interest == 'football':
+            invalid_football = {'League', 'Cup', 'FC', 'United', 'City'}
+            return not any(word in entity for word in invalid_football)
+        elif interest == 'technology':
+            tech_indicators = {'Inc', 'Corp', 'Technologies', 'Software', 'Tech'}
+            return any(word in entity for word in tech_indicators)
+        return True
 
     def _generate_fallback_question(self, articles: List[str], interest: str) -> str:
         """Generate a simple fallback question"""

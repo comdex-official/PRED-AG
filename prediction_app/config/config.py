@@ -1,4 +1,9 @@
+import os
 from typing import Dict
+from .loader import load_config
+
+# Load environment variables first
+load_config()
 
 # News source configurations
 NEWS_SOURCES = {
@@ -83,7 +88,7 @@ OPENAI_CONFIG = {
 
 # Question generation configuration
 QUESTION_CONFIG = {
-    "default_count": 5,
-    "min_count": 1,
-    "max_count": 10
+    "default_count": int(os.getenv('DEFAULT_QUESTION_COUNT', '5')),
+    "min_count": int(os.getenv('MIN_QUESTION_COUNT', '1')),
+    "max_count": int(os.getenv('MAX_QUESTION_COUNT', '10'))
 }
