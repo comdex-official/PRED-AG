@@ -1,11 +1,8 @@
 from prediction_app.managers.prediction_manager import PredictionManager
+from prediction_app.config.config import QUESTION_CONFIG
 import os
-from dotenv import load_dotenv
 
 def main():
-    # Load environment variables
-    load_dotenv()
-    
     # Get username
     username = input("Enter your username: ")
     
@@ -46,20 +43,26 @@ def main():
         choice = input("\nEnter your choice (1-4): ")
         
         if choice == "1":
-            # Get a new question
-            print("\nGenerating new question...")
-            result = manager.get_fresh_question()
+            # Get new questions
+            print("\nGenerating new questions...")
+            result = manager.get_fresh_questions(QUESTION_CONFIG["default_count"])
             
             if "error" in result:
                 print(f"Error: {result['error']}")
                 break
             
-            print("\n=== Generated Question ===")
-            print(result["question"])
-            print(f"(Source: {result['source']})")
+            print("\n=== Generated Questions ===")
+            for i, q in enumerate(result["questions"], 1):
+                print(f"\n{i}. {q['question']}")
+                print(f"(Interest: {q['interest']}, Source: {q['source']})")
+            
             print("\n=== Based on Articles ===")
-            for article in result["source_articles"]:
-                print(f"- {article}")
+            seen_articles = set()
+            for q in result["questions"]:
+                for article in q["source_articles"]:
+                    if article not in seen_articles:
+                        print(f"- {article}")
+                        seen_articles.add(article)
         elif choice == "2":
             show_question_history(manager)
         elif choice == "3":
