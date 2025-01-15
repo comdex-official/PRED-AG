@@ -3,6 +3,8 @@ import json
 from datetime import datetime, timedelta
 from .models import Session, Question, User, user_questions
 from sqlalchemy.sql import func
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 class DatabaseManager:
     def __init__(self):
@@ -19,16 +21,24 @@ class DatabaseManager:
         return user.id
 
     def get_user(self, username: str) -> Optional[dict]:
-        """Get user by username"""
-        user = self.session.query(User).filter(User.username == username).first()
-        if user:
-            return {
-                'id': user.id,
-                'username': user.username,
-                'interests': json.loads(user.interests),
-                'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S')
-            }
-        return None
+        """Get user by username with sanitized input"""
+        try:
+            # Use parameterized query
+            user = self.session.query(User)\
+                .filter(User.username == username)\
+                .first()
+            
+            if user:
+                return {
+                    'id': user.id,
+                    'username': user.username,
+                    'interests': json.loads(user.interests),
+                    'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            return None
+        except SQLAlchemyError as e:
+            print(f"Database error: {str(e)}")
+            return None
 
     def get_unused_question(self, interest: str, user_id: int) -> Optional[dict]:
         """Get a random question that hasn't been shown to this user"""
@@ -54,15 +64,24 @@ class DatabaseManager:
         return None
 
     def mark_question_as_viewed(self, question_id: int, user_id: int) -> None:
-        """Mark that a user has viewed a question"""
-        self.session.execute(
-            user_questions.insert().values(
-                user_id=user_id,
-                question_id=question_id,
-                viewed_at=datetime.utcnow()
+        """Mark question as viewed with input validation"""
+        try:
+            # Validate inputs
+            if not isinstance(question_id, int) or not isinstance(user_id, int):
+                raise ValueError("Invalid input types")
+            
+            # Use SQLAlchemy's built-in parameter binding
+            self.session.execute(
+                user_questions.insert().values(
+                    user_id=user_id,
+                    question_id=question_id,
+                    viewed_at=datetime.utcnow()
+                )
             )
-        )
-        self.session.commit()
+            self.session.commit()
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            print(f"Database error: {str(e)}")
 
     def get_user_question_history(self, user_id: int, interest: Optional[str] = None) -> List[dict]:
         """Get questions viewed by a specific user"""
@@ -138,38 +157,73 @@ class DatabaseManager:
         } for q in questions]
 
     def resolve_question(self, question_id: int, result: bool, note: str = None) -> None:
-        """Resolve a question with its result"""
-        question = self.session.query(Question).get(question_id)
-        if question:
-            question.status = 'resolved'
-            question.result = result
-            question.resolution_note = note
-            self.session.commit() 
+        """Resolve question with input validation"""
+        try:
+            # Validate inputs
+            if not isinstance(question_id, int):
+                raise ValueError("Invalid question_id type")
+            if not isinstance(result, bool):
+                raise ValueError("Invalid result type")
+            if note is not None:
+                note = str(note)[:500]  # Limit note length
+            
+            question = self.session.query(Question).get(question_id)
+            if question:
+                question.status = 'resolved'
+                question.result = result
+                question.resolution_note = note
+                self.session.commit()
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            print(f"Database error: {str(e)}")
 
     def update_user_interests(self, user_id: int, interests: List[str]) -> None:
-        """Update user interests"""
-        user = self.session.query(User).filter(User.id == user_id).first()
-        if user:
-            user.interests = json.dumps(interests)
-            self.session.commit() 
+        """Update user interests with input validation"""
+        try:
+            # Validate inputs
+            if not isinstance(user_id, int):
+                raise ValueError("Invalid user_id type")
+            if not isinstance(interests, list):
+                raise ValueError("Invalid interests type")
+            
+            # Sanitize interests
+            interests = [str(i).lower() for i in interests]
+            
+            user = self.session.query(User).filter(User.id == user_id).first()
+            if user:
+                user.interests = json.dumps(interests)
+                self.session.commit()
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            print(f"Database error: {str(e)}")
 
     def get_multiple_unused_questions(self, interest: str, user_id: int, count: int = 5) -> List[dict]:
-        """Get multiple random questions that haven't been shown to this user"""
-        subquery = self.session.query(user_questions.c.question_id)\
-            .filter(user_questions.c.user_id == user_id)\
-            .subquery()
+        """Get multiple random questions with sanitized inputs"""
+        try:
+            # Validate inputs
+            if not isinstance(user_id, int) or not isinstance(count, int):
+                raise ValueError("Invalid input types")
             
-        questions = self.session.query(Question)\
-            .filter(Question.interest == interest)\
-            .filter(~Question.id.in_(subquery))\
-            .order_by(func.random())\
-            .limit(count)\
-            .all()
+            interest = str(interest).lower()  # Sanitize interest
             
-        return [{
-            'id': q.id,
-            'question': q.question_text,
-            'interest': q.interest,
-            'source_articles': json.loads(q.source_articles),
-            'created_at': q.created_at.strftime('%Y-%m-%d %H:%M:%S')
-        } for q in questions] 
+            subquery = self.session.query(user_questions.c.question_id)\
+                .filter(user_questions.c.user_id == user_id)\
+                .subquery()
+                
+            questions = self.session.query(Question)\
+                .filter(Question.interest == interest)\
+                .filter(~Question.id.in_(subquery))\
+                .order_by(func.random())\
+                .limit(count)\
+                .all()
+                
+            return [{
+                'id': q.id,
+                'question': q.question_text,
+                'interest': q.interest,
+                'source_articles': json.loads(q.source_articles),
+                'created_at': q.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            } for q in questions]
+        except SQLAlchemyError as e:
+            print(f"Database error: {str(e)}")
+            return [] 
