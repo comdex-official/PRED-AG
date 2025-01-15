@@ -40,12 +40,22 @@ class QuestionGenerator:
             'cricket': [
                 "Will {team} score {runs} runs against {opponent} {time}?",
                 "Can {player} take {wickets} wickets in the match {time}?",
-                "Will {team} win by {runs} runs {time}?"
+                "Will {team} win by {runs} runs {time}?",
+                "Will {player} score more runs than {opponent_player} {time}?",
+                "Can {player} score a century before {opponent_player} {time}?",
+                "Will {player} take more wickets than {opponent_player} {time}?",
+                "Who will score more boundaries: {player} or {opponent_player} {time}?",
+                "Will {player} and {opponent_player} both score fifties {time}?"
             ],
             'football': [
                 "Will {team} score {goals} goals against {opponent} {time}?",
                 "Can {player} score in the first {minutes} minutes {time}?",
-                "Will {team} win with a {goals}-goal margin {time}?"
+                "Will {team} win with a {goals}-goal margin {time}?",
+                "Who will score first: {player} or {opponent_player} {time}?",
+                "Will {player} score more goals than {opponent_player} {time}?",
+                "Can {player} get more assists than {opponent_player} {time}?",
+                "Will both {player} and {opponent_player} score {time}?",
+                "Who will have more shots on target: {player} or {opponent_player} {time}?"
             ],
             'technology': [
                 "Will {company}'s stock rise by {percent}% {time}?",
@@ -70,14 +80,33 @@ class QuestionGenerator:
         self.entities = {
             'cricket': {
                 'team': ['India', 'Australia', 'England', 'South Africa'],
-                'player': ['Kohli', 'Smith', 'Root', 'Williamson'],
+                'player': [
+                    'Virat Kohli', 'Rohit Sharma', 'KL Rahul', 
+                    'Steve Smith', 'David Warner', 'Marnus Labuschagne',
+                    'Joe Root', 'Ben Stokes', 'Jonny Bairstow',
+                    'Kane Williamson', 'Babar Azam', 'Shakib Al Hasan'
+                ],
+                'opponent_player': [
+                    'Pat Cummins', 'Mitchell Starc', 'Josh Hazlewood',
+                    'James Anderson', 'Stuart Broad', 'Jasprit Bumrah',
+                    'Kagiso Rabada', 'Trent Boult', 'Shaheen Afridi'
+                ],
                 'runs': [200, 250, 300, 350],
                 'wickets': [3, 4, 5, 6],
                 'opponent': ['Pakistan', 'New Zealand', 'West Indies', 'Sri Lanka']
             },
             'football': {
                 'team': ['Manchester United', 'Liverpool', 'Barcelona', 'Real Madrid'],
-                'player': ['Haaland', 'Mbappe', 'Salah', 'Kane'],
+                'player': [
+                    'Erling Haaland', 'Kylian Mbappe', 'Mohamed Salah',
+                    'Harry Kane', 'Kevin De Bruyne', 'Bruno Fernandes',
+                    'Vinicius Jr', 'Jude Bellingham', 'Marcus Rashford'
+                ],
+                'opponent_player': [
+                    'Robert Lewandowski', 'Victor Osimhen', 'Lautaro Martinez',
+                    'Bukayo Saka', 'Phil Foden', 'Rafael Leao',
+                    'Darwin Nunez', 'Gabriel Jesus', 'Julian Alvarez'
+                ],
                 'goals': [2, 3, 4, 5],
                 'minutes': [30, 45, 60],
                 'opponent': ['Chelsea', 'Arsenal', 'Bayern Munich', 'PSG']
