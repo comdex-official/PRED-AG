@@ -15,12 +15,14 @@ class PredictionQuestion(BaseModel):
         if not any(v.startswith(start) for start in valid_starts):
             raise ValueError("Question must start with 'Will', 'Can', or 'Who will'")
         
-        # Must contain a number, comparison, or be about multiple players
+        # Must contain a number, comparison, be about multiple players, or be about policy/government
         if not (any(char.isdigit() for char in v) or  # Has numbers
                 ('more' in v.lower() and 'than' in v.lower()) or  # Comparison
                 'both' in v.lower() or  # Multiple players
-                v.lower().startswith('who will')):  # Direct comparison
-            raise ValueError("Question must contain a number, comparison, or be about multiple players")
+                v.lower().startswith('who will') or  # Direct comparison
+                any(word in v.lower() for word in  # Policy/government related
+                    ['policy', 'bill', 'government', 'implement'])):
+            raise ValueError("Question must contain a number, comparison, or be about policy/government")
         
         # Must contain proper names (not single letters)
         words = v.split()
@@ -359,9 +361,15 @@ class QuestionGenerator:
         return True
 
     def _generate_fallback_question(self, articles: List[str], interest: str) -> str:
-        """Generate a simple fallback question"""
-        entities = self.entities.get(interest, self.entities['cricket'])
-        return f"Will {random.choice(entities['team'])} win tomorrow?" 
+        """Generate a simple fallback question based on interest"""
+        entities = self.entities.get(interest, self.entities['sports'])
+        
+        if interest == 'politics':
+            return f"Will {random.choice(entities['politician'])} win {random.choice(entities['percent'])}% votes tomorrow?"
+        elif interest == 'technology':
+            return f"Will {random.choice(entities['company'])} launch {random.choice(entities['product'])} tomorrow?"
+        else:
+            return f"Will {random.choice(entities['team'])} win tomorrow?"
 
     def generate_multiple_questions(self, articles: List[str], interest: str, count: int = 5) -> List[str]:
         """Generate multiple prediction questions based on articles and interest"""
