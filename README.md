@@ -31,5 +31,8 @@ pip install -r requirements.txt
 # Run the API for local development
 python run_api.py
 
-#Download spacy model
+# Download spaCy model
 python -m spacy download en_core_web_sm
+
+# Set up environment variables
+cp .env.example .env  # Copy example env file and update with your values

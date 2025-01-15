@@ -136,38 +136,135 @@ class QuestionResolver:
             return []
 
     def _analyze_articles(self, articles: List[str], question: str, entities: Dict) -> Dict:
-        """Enhanced article analysis using NLP"""
+        """Enhanced article analysis using interest-specific NLP"""
         docs = [self.nlp(article) for article in articles]
         question_doc = self.nlp(question)
+        interest = self._determine_interest(question)
         
-        confidence = 0.0
-        outcome = False
-        evidence = []
-        
-        # Different analysis strategies based on question type
-        if entities['comparison_type'] == 'more_than':
-            outcome, confidence, evidence = self._analyze_comparison(
-                docs, entities['players'], entities['metrics']
+        # Interest-specific analysis
+        if interest == 'technology':
+            outcome, confidence, evidence = self._analyze_tech_question(
+                docs, question, entities
             )
-        elif entities['comparison_type'] == 'first':
-            outcome, confidence, evidence = self._analyze_sequence(
-                docs, entities['players'], entities['metrics']
+        elif interest == 'politics':
+            outcome, confidence, evidence = self._analyze_politics_question(
+                docs, question, entities
             )
-        elif entities['comparison_type'] == 'both':
-            outcome, confidence, evidence = self._analyze_multiple_achievements(
-                docs, entities['players'], entities['metrics']
+        elif interest == 'football':
+            outcome, confidence, evidence = self._analyze_football_question(
+                docs, question, entities
+            )
+        elif interest == 'cricket':
+            outcome, confidence, evidence = self._analyze_cricket_question(
+                docs, question, entities
             )
         else:
-            outcome, confidence, evidence = self._analyze_single_achievement(
-                docs, entities['players'], entities['teams'], 
-                entities['metrics'], entities['values']
-            )
+            # Fall back to generic analysis
+            if entities['comparison_type'] == 'more_than':
+                outcome, confidence, evidence = self._analyze_comparison(
+                    docs, entities['players'], entities['metrics']
+                )
+            elif entities['comparison_type'] == 'first':
+                outcome, confidence, evidence = self._analyze_sequence(
+                    docs, entities['players'], entities['metrics']
+                )
         
         return {
             'outcome': outcome if confidence >= self.CONFIDENCE_THRESHOLD else None,
             'confidence': confidence,
             'explanation': self._format_evidence(evidence)
         }
+
+    def _analyze_football_question(self, docs, question: str, entities: Dict) -> tuple:
+        """Football-specific analysis"""
+        # Extract football-specific metrics
+        metrics = {
+            'goals': r'(?:scored|netted|put away|slotted home)\s*(\d+)\s*goals?',
+            'assists': r'(?:assisted|set up|provided)\s*(\d+)\s*(?:goals?|times)',
+            'shots': r'(?:had|took|attempted)\s*(\d+)\s*shots?',
+            'saves': r'(?:made|recorded|managed)\s*(\d+)\s*saves?'
+        }
+        
+        evidence = []
+        stats = {metric: [] for metric in metrics}
+        
+        for doc in docs:
+            for sent in doc.sents:
+                sent_lower = sent.text.lower()
+                
+                # Match all relevant players/teams in sentence
+                relevant = any(entity in sent.text for entity in 
+                             entities['players'] + entities['teams'])
+                
+                if relevant:
+                    # Extract statistics using patterns
+                    for metric, pattern in metrics.items():
+                        matches = re.finditer(pattern, sent_lower)
+                        for match in matches:
+                            value = int(match.group(1))
+                            stats[metric].append(value)
+                            evidence.append(sent.text)
+        
+        # Determine outcome based on question type
+        if 'goals' in question.lower():
+            target = int(entities['values'][0]) if entities['values'] else 0
+            achieved = any(v >= target for v in stats['goals'])
+            confidence = min(1.0, len(stats['goals']) / 3)
+            return achieved, confidence, evidence
+        
+        return self._analyze_comparison(docs, entities['players'], entities['metrics'])
+
+    def _analyze_cricket_question(self, docs, question: str, entities: Dict) -> tuple:
+        """Cricket-specific analysis"""
+        # Extract cricket-specific metrics
+        metrics = {
+            'runs': r'(?:scored|made|hit)\s*(\d+)\s*runs?',
+            'wickets': r'(?:took|claimed|grabbed)\s*(\d+)\s*wickets?',
+            'centuries': r'(?:scored|hit|completed)\s*(?:a|his|her)\s*(?:century|hundred)',
+            'fifties': r'(?:scored|hit|made)\s*(?:a|his|her)\s*(?:fifty|half-century)'
+        }
+        
+        evidence = []
+        stats = {metric: [] for metric in metrics}
+        achievements = {
+            'centuries': 0,
+            'fifties': 0
+        }
+        
+        for doc in docs:
+            for sent in doc.sents:
+                sent_lower = sent.text.lower()
+                
+                # Match relevant players/teams
+                relevant = any(entity in sent.text for entity in 
+                             entities['players'] + entities['teams'])
+                
+                if relevant:
+                    # Extract numerical statistics
+                    for metric, pattern in metrics.items():
+                        if metric in ['runs', 'wickets']:
+                            matches = re.finditer(pattern, sent_lower)
+                            for match in matches:
+                                value = int(match.group(1))
+                                stats[metric].append(value)
+                                evidence.append(sent.text)
+                        else:
+                            # Count achievements like centuries/fifties
+                            if re.search(pattern, sent_lower):
+                                achievements[metric] += 1
+                                evidence.append(sent.text)
+        
+        # Determine outcome based on question type
+        if 'century' in question.lower():
+            achieved = achievements['centuries'] > 0
+            confidence = min(1.0, len(evidence) / 2)
+            return achieved, confidence, evidence
+        elif 'fifty' in question.lower() or 'half-century' in question.lower():
+            achieved = achievements['fifties'] > 0
+            confidence = min(1.0, len(evidence) / 2)
+            return achieved, confidence, evidence
+        
+        return self._analyze_comparison(docs, entities['players'], entities['metrics'])
 
     def _analyze_comparison(self, docs, players, metrics) -> tuple:
         """Analyze comparative questions"""
@@ -247,3 +344,178 @@ class QuestionResolver:
             formatted += f"{i}. {e}\n"
             
         return formatted 
+
+    def _determine_interest(self, question: str) -> str:
+        """Determine the interest based on question content"""
+        keywords = {
+            'football': {'goal', 'assist', 'shot', 'save', 'striker', 'midfielder'},
+            'cricket': {'run', 'wicket', 'century', 'batting', 'bowling', 'innings'},
+            'politics': {'votes', 'bill', 'policy', 'election', 'approval', 'parliament',
+                        'congress', 'senate', 'government', 'polling'},
+            'technology': {'launch', 'release', 'users', 'download', 'bug', 'feature',
+                         'update', 'version', 'app', 'software', 'device', 'product',
+                         'startup', 'tech', 'AI', 'cloud', 'platform'}
+        }
+        
+        question_lower = question.lower()
+        for interest, words in keywords.items():
+            if any(word in question_lower for word in words):
+                return interest
+        
+        return 'general'
+
+    def _analyze_politics_question(self, docs, question: str, entities: Dict) -> tuple:
+        """Politics-specific analysis"""
+        metrics = {
+            'votes': r'(?:received|got|won)\s*(\d+)(?:\s*%|\s*percent)\s*(?:of\s*)?(?:the\s*)?votes?',
+            'approval': r'(?:approval|rating)\s*(?:of|at)\s*(\d+)(?:\s*%|\s*percent)',
+            'polls': r'polling\s*at\s*(\d+)(?:\s*%|\s*percent)',
+            'seats': r'(?:won|secured|got)\s*(\d+)\s*seats?',
+            'majority': r'(?:majority|lead)\s*of\s*(\d+)(?:\s*%|\s*percent)?'
+        }
+        
+        evidence = []
+        stats = {metric: [] for metric in metrics}
+        
+        # Additional political outcomes
+        bill_status = {
+            'passed': 0,
+            'failed': 0,
+            'pending': 0
+        }
+        
+        for doc in docs:
+            for sent in doc.sents:
+                sent_lower = sent.text.lower()
+                
+                # Match relevant politicians/parties
+                relevant = any(entity in sent.text for entity in 
+                             entities['players'] + entities['teams'])
+                
+                if relevant:
+                    # Extract numerical statistics
+                    for metric, pattern in metrics.items():
+                        matches = re.finditer(pattern, sent_lower)
+                        for match in matches:
+                            value = int(match.group(1))
+                            stats[metric].append(value)
+                            evidence.append(sent.text)
+                    
+                    # Check for bill/policy outcomes
+                    if 'bill' in question.lower() or 'policy' in question.lower():
+                        if any(word in sent_lower for word in ['passed', 'approved', 'enacted']):
+                            bill_status['passed'] += 1
+                            evidence.append(sent.text)
+                        elif any(word in sent_lower for word in ['failed', 'rejected', 'defeated']):
+                            bill_status['failed'] += 1
+                            evidence.append(sent.text)
+                        elif any(word in sent_lower for word in ['pending', 'proposed', 'introduced']):
+                            bill_status['pending'] += 1
+                            evidence.append(sent.text)
+        
+        # Determine outcome based on question type
+        if any(word in question.lower() for word in ['votes', 'polling', 'approval']):
+            target = int(entities['values'][0]) if entities['values'] else 0
+            relevant_stats = stats['votes'] + stats['approval'] + stats['polls']
+            if relevant_stats:
+                achieved = any(v >= target for v in relevant_stats)
+                confidence = min(1.0, len(relevant_stats) / 3)
+                return achieved, confidence, evidence
+        
+        elif 'bill' in question.lower() or 'policy' in question.lower():
+            if bill_status['passed'] > bill_status['failed']:
+                return True, min(1.0, bill_status['passed'] / 2), evidence
+            elif bill_status['failed'] > 0:
+                return False, min(1.0, bill_status['failed'] / 2), evidence
+        
+        return self._analyze_comparison(docs, entities['players'], entities['metrics']) 
+
+    def _analyze_tech_question(self, docs, question: str, entities: Dict) -> tuple:
+        """Technology-specific analysis"""
+        metrics = {
+            'users': r'(?:reached|achieved|hit)\s*(\d+)(?:\s*million|\s*k|\s*M)?\s*(?:users|customers|downloads)',
+            'revenue': r'(?:revenue|sales)\s*of\s*\$?(\d+)(?:\s*million|\s*M|\s*B)?',
+            'growth': r'(?:grew|increased|up)\s*(?:by\s*)?(\d+)(?:\s*%|\s*percent)',
+            'market_share': r'(?:market share|share)\s*of\s*(\d+)(?:\s*%|\s*percent)',
+            'bugs': r'(?:fixed|resolved|patched)\s*(\d+)\s*(?:bugs|issues|defects)'
+        }
+        
+        # Product launch indicators
+        launch_status = {
+            'announced': 0,
+            'released': 0,
+            'delayed': 0,
+            'cancelled': 0
+        }
+        
+        evidence = []
+        stats = {metric: [] for metric in metrics}
+        
+        for doc in docs:
+            for sent in doc.sents:
+                sent_lower = sent.text.lower()
+                
+                # Match relevant companies/products
+                relevant = any(entity in sent.text for entity in 
+                             entities['players'] + entities['teams'])
+                
+                if relevant:
+                    # Extract numerical metrics
+                    for metric, pattern in metrics.items():
+                        matches = re.finditer(pattern, sent_lower)
+                        for match in matches:
+                            try:
+                                value = int(match.group(1))
+                                # Handle million/billion multipliers
+                                if 'million' in sent_lower or 'M' in sent.text:
+                                    value *= 1_000_000
+                                elif 'B' in sent.text:
+                                    value *= 1_000_000_000
+                                elif 'k' in sent_lower:
+                                    value *= 1_000
+                                stats[metric].append(value)
+                                evidence.append(sent.text)
+                            except ValueError:
+                                continue
+                    
+                    # Check for product launches
+                    if 'launch' in question.lower() or 'release' in question.lower():
+                        if any(word in sent_lower for word in ['announced', 'unveiled', 'revealed']):
+                            launch_status['announced'] += 1
+                            evidence.append(sent.text)
+                        elif any(word in sent_lower for word in ['launched', 'released', 'available']):
+                            launch_status['released'] += 1
+                            evidence.append(sent.text)
+                        elif any(word in sent_lower for word in ['delayed', 'postponed']):
+                            launch_status['delayed'] += 1
+                            evidence.append(sent.text)
+                        elif any(word in sent_lower for word in ['cancelled', 'scrapped']):
+                            launch_status['cancelled'] += 1
+                            evidence.append(sent.text)
+        
+        # Determine outcome based on question type
+        if any(word in question.lower() for word in ['users', 'customers', 'downloads']):
+            target = int(entities['values'][0]) if entities['values'] else 0
+            if stats['users']:
+                achieved = any(v >= target for v in stats['users'])
+                confidence = min(1.0, len(stats['users']) / 2)
+                return achieved, confidence, evidence
+        
+        elif 'launch' in question.lower() or 'release' in question.lower():
+            if launch_status['cancelled'] > 0:
+                return False, 1.0, evidence
+            elif launch_status['released'] > 0:
+                return True, 1.0, evidence
+            elif launch_status['delayed'] > 0:
+                return False, min(1.0, launch_status['delayed'] / 2), evidence
+            elif launch_status['announced'] > 0:
+                return True, 0.7, evidence
+        
+        elif 'bugs' in question.lower() or 'issues' in question.lower():
+            target = int(entities['values'][0]) if entities['values'] else 0
+            if stats['bugs']:
+                achieved = any(v >= target for v in stats['bugs'])
+                confidence = min(1.0, len(stats['bugs']) / 2)
+                return achieved, confidence, evidence
+        
+        return self._analyze_comparison(docs, entities['players'], entities['metrics']) 
