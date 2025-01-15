@@ -24,3 +24,12 @@ curl -X POST "http://localhost:8000/questions/1/resolve/" \
      -H "Content-Type: application/json" \
      -H "username: john" \
      -d '{"result": "yes", "note": "Team won the match"}'
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the API for local development
+python run_api.py
+
+#Download spacy model
+python -m spacy download en_core_web_sm

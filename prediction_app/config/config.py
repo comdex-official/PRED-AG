@@ -92,3 +92,18 @@ QUESTION_CONFIG = {
     "min_count": int(os.getenv('MIN_QUESTION_COUNT', '1')),
     "max_count": int(os.getenv('MAX_QUESTION_COUNT', '10'))
 }
+
+# Add resolver configuration
+RESOLVER_CONFIG = {
+    'confidence_threshold': 0.7,
+    'min_articles': 3,
+    'positive_words': {
+        'scored', 'won', 'victory', 'successful', 'achieved', 'record',
+        'impressive', 'excellent', 'outstanding', 'dominant', 'triumph'
+    },
+    'negative_words': {
+        'missed', 'failed', 'lost', 'defeated', 'struggled', 'poor',
+        'disappointing', 'injury', 'suspended', 'benched'
+    },
+    'update_frequency': 60  # minutes
+}
