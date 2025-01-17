@@ -130,34 +130,34 @@ async def fetch_questions(
         questions = []  # Reset questions on error
     
     # If we don't have enough questions, fetch fresh ones
-    # if len(questions) < count:
-    #     needed_count = count - len(questions)
-    #     logging.info(f"Fetching {needed_count} fresh questions for user {user['id']}")
-    #     fresh_questions = manager.get_fresh_questions(needed_count)
-    #     logging.info(f"Fresh questions response: {fresh_questions}")
+    if len(questions) < count:
+        needed_count = count - len(questions)
+        logging.info(f"Fetching {needed_count} fresh questions for user {user['id']}")
+        fresh_questions = manager.get_fresh_questions(needed_count)
+        logging.info(f"Fresh questions response: {fresh_questions}")
         
-    #     if "error" in fresh_questions:
-    #         error_msg = fresh_questions["error"]
-    #         logging.error(f"Error fetching fresh questions: {error_msg}")
-    #         if not questions:  # Only raise error if we have no questions at all
-    #             raise HTTPException(status_code=400, detail=error_msg)
-    #     else:
-    #         logging.info(f"Successfully retrieved {len(fresh_questions['questions'])} fresh questions")
-    #         # Add fresh questions to the database
-    #         for q in fresh_questions["questions"]:
-    #             question_id = db_manager.create_question(
-    #                 question_text=q["question"],
-    #                 interest=q["interest"],
-    #                 source_articles=q["source_articles"],
-    #                 source_links=q["source_links"]
-    #             )
-    #             questions.append({
-    #                 "id": question_id,
-    #                 "question": q["question"],
-    #                 "interest": q["interest"],
-    #                 "source_articles": q["source_articles"],
-    #                 "created_at": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    #             })
+        if "error" in fresh_questions:
+            error_msg = fresh_questions["error"]
+            logging.error(f"Error fetching fresh questions: {error_msg}")
+            if not questions:  # Only raise error if we have no questions at all
+                raise HTTPException(status_code=400, detail=error_msg)
+        else:
+            logging.info(f"Successfully retrieved {len(fresh_questions['questions'])} fresh questions")
+            # Add fresh questions to the database
+            for q in fresh_questions["questions"]:
+                question_id = db_manager.create_question(
+                    question_text=q["question"],
+                    interest=q["interest"],
+                    source_articles=q["source_articles"],
+                    source_links=q["source_links"]
+                )
+                questions.append({
+                    "id": question_id,
+                    "question": q["question"],
+                    "interest": q["interest"],
+                    "source_articles": q["source_articles"],
+                    "created_at": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                })
     
     return questions[:count]
 
