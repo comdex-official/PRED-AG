@@ -9,6 +9,7 @@ import logging
 from ..scrapers.news_scraper import NewsScraper
 from ..agents.question_generator import QuestionGenerator
 from ..database.db_manager import DatabaseManager
+from ..database.models import UserQuestionResponse
 from ..config.config import QUESTION_CONFIG
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class PredictionManager:
                 count=count
             )
             
-            # Save questions to database and mark as viewed
+            # Save questions to database and create user response entries
             saved_questions = []
             for q in questions:
                 question_id = self.db_manager.create_question(
@@ -72,8 +73,17 @@ class PredictionManager:
                     source_articles=articles,
                     source_links=q["sources"]
                 )
-                # Mark question as viewed by this user
-                self.db_manager.mark_question_as_viewed(question_id, self.user_id)
+                # Create user response entry without viewed_at
+                response = UserQuestionResponse(
+                    user_id=self.user_id,
+                    question_id=question_id
+                )
+                self.db_manager.session.add(response)
+                self.db_manager.session.commit()
+                
+                q["interest"] = interest
+                q["source_articles"] = articles
+                q["source_links"] = q.pop("sources")  # Rename "sources" to "source_links"
                 saved_questions.append(q)
             
             return {

@@ -36,3 +36,6 @@ python -m spacy download en_core_web_sm
 
 # Set up environment variables
 cp .env.example .env  # Copy example env file and update with your values
+
+# Run the API for local development
+uvicorn prediction_app.api.main:app --reload
