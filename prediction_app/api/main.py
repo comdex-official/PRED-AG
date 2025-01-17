@@ -70,7 +70,7 @@ async def update_user_interests(interests: UserInterests, user: dict = Depends(g
 QUESTION_CONFIG = {
     "default_count": 5,
     "min_count": 1,
-    "max_count": 20
+    "max_count": 30
 }
 
 @app.get("/questions/", response_model=List[Question])

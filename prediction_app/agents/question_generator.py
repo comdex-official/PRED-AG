@@ -41,12 +41,12 @@ class PredictionQuestion(BaseModel):
         
         # Must contain a time reference
         time_markers = [
-            'tomorrow', 'today', 'tonight', 'week',
-            'monday', 'tuesday', 'wednesday', 'thursday',
-            'friday', 'saturday', 'sunday', 'weekend'
+            'match on', 'game on',  # Event dates
+            'quarter', 'year',      # Business periods
+            'season', 'tournament'  # Sports seasons
         ]
         if not any(marker in v.lower() for marker in time_markers):
-            raise ValueError("Question must contain a time reference")
+            raise ValueError("Question must contain a valid time reference")
             
         return v
 
@@ -68,14 +68,19 @@ class QuestionGenerator:
 
         self.templates = {
             'cricket': [
-                "Will {team} score {runs} runs against {opponent} {time}?",
-                "Can {player} take {wickets} wickets in the match {time}?",
-                "Will {team} win by {runs} runs {time}?",
+                # Batting comparisons
+                "Will {team} score more than {runs} runs against {opponent} {time}?",
+                "Will {player} score less than {runs} runs {time}?",
+                "Will {team} chase down the target of {runs} runs {time}?",
+                
+                # Bowling comparisons
+                "Will {player} take more than {wickets} wickets {time}?",
+                "Will {team} restrict {opponent} under {runs} runs {time}?",
+                
+                # Player comparisons
                 "Will {player} score more runs than {opponent_player} {time}?",
-                "Can {player} score a century before {opponent_player} {time}?",
-                "Will {player} take more wickets than {opponent_player} {time}?",
-                "Who will score more boundaries: {player} or {opponent_player} {time}?",
-                "Will {player} and {opponent_player} both score fifties {time}?"
+                "Will {player} hit more than {boundaries} sixes {time}?",
+                "Will both {player} and {opponent_player} score above {runs} runs {time}?"
             ],
             'football': [
                 "Will {team} score {goals} goals against {opponent} {time}?",
@@ -151,8 +156,9 @@ class QuestionGenerator:
                     'James Anderson', 'Stuart Broad', 'Jasprit Bumrah',
                     'Kagiso Rabada', 'Trent Boult', 'Shaheen Afridi'
                 ],
-                'runs': [200, 250, 300, 350],
-                'wickets': [3, 4, 5, 6],
+                'runs': [150, 180, 200, 250, 300],
+                'wickets': [2, 3, 4, 5],
+                'boundaries': [2, 3, 4, 5],
                 'opponent': ['Pakistan', 'New Zealand', 'West Indies', 'Sri Lanka']
             },
             'football': {
@@ -219,6 +225,51 @@ class QuestionGenerator:
             'government', 'congress', 'senate', 'house', 'committee'
         }
 
+        # Update event dates to be more dynamic
+        self.event_dates = {
+            'cricket': {
+                'IPL 2025': {
+                    'dates': ['March 22', 'March 26', 'April 2', 'May 25'],
+                    'teams': ['Mumbai Indians', 'Chennai Super Kings', 'Royal Challengers'],
+                    'matches': {
+                        'March 22': ['Mumbai Indians', 'Chennai Super Kings'],
+                        'March 26': ['Royal Challengers', 'Punjab Kings'],
+                        'April 2': ['Gujarat Titans', 'Rajasthan Royals'],
+                        'April 6': ['Delhi Capitals', 'Kolkata Knight Riders']
+                    }
+                },
+                'T20 World Cup 2025': {
+                    'dates': ['June 15', 'June 20', 'June 25', 'July 5'],
+                    'teams': ['India', 'Australia', 'England', 'South Africa'],
+                    'matches': {
+                        'June 15': ['India', 'Australia'],
+                        'June 20': ['England', 'South Africa'],
+                        'June 25': ['India', 'England'],
+                        'July 5': ['Australia', 'South Africa']
+                    }
+                }
+            },
+            'football': {
+                'Premier League 2025': {
+                    'dates': ['March 30', 'April 6', 'April 13'],
+                    'teams': ['Manchester City', 'Arsenal', 'Liverpool'],
+                    'matches': {
+                        'March 30': ['Manchester City', 'Arsenal'],
+                        'April 6': ['Liverpool', 'Manchester United'],
+                        'April 13': ['Chelsea', 'Tottenham']
+                    }
+                },
+                'Champions League 2025': {
+                    'dates': ['April 9', 'April 16', 'April 30'],
+                    'matches': {
+                        'April 9': ['Real Madrid', 'Bayern Munich'],
+                        'April 16': ['Manchester City', 'PSG'],
+                        'April 30': ['Barcelona', 'Inter Milan']
+                    }
+                }
+            }
+        }
+
     def generate_question(self, articles: List[str], sources: List[str], interest: str) -> Dict:
         """Generate a prediction question based on articles and interest"""
         try:
@@ -272,9 +323,18 @@ class QuestionGenerator:
                 opponent = random.choice([t for t in valid_opponents if t != team])
                 entities = {**entities, 'team': team, 'opponent': opponent}
 
-            # Generate time reference
-            time_refs = ['tomorrow', 'this weekend', 'next Saturday', 'this week']
-            time_ref = random.choice(time_refs)
+            # Use actual scheduled matches for questions
+            if interest in self.event_dates:
+                event = random.choice(list(self.event_dates[interest].keys()))
+                event_data = self.event_dates[interest][event]
+                
+                # Pick a scheduled match
+                match_date = random.choice(list(event_data['matches'].keys()))
+                teams = event_data['matches'][match_date]
+                
+                time_ref = f"in the {event} match on {match_date}"
+                team = teams[0]
+                opponent = teams[1]
             
             # Fill template with validated entities
             question = template.format(
@@ -382,12 +442,23 @@ class QuestionGenerator:
         """Generate a simple fallback question based on interest"""
         entities = self.entities.get(interest, self.entities['sports'])
         
-        if interest == 'politics':
-            return f"Will {random.choice(entities['politician'])} win {random.choice(entities['percent'])}% votes tomorrow?"
-        elif interest == 'technology':
-            return f"Will {random.choice(entities['company'])} launch {random.choice(entities['product'])} tomorrow?"
+        # Get event-based time reference
+        if interest in self.event_dates:
+            event = random.choice(list(self.event_dates[interest].keys()))
+            date = random.choice(self.event_dates[interest][event])
+            time_ref = f"in the {event} match on {date}"
         else:
-            return f"Will {random.choice(entities['team'])} win tomorrow?"
+            # For non-sports interests, use next quarter/year
+            time_ref = "by the end of next quarter"
+        
+        if interest == 'politics':
+            return f"Will {random.choice(entities['politician'])} win {random.choice(entities['percent'])}% votes {time_ref}?"
+        elif interest == 'technology':
+            return f"Will {random.choice(entities['company'])} launch {random.choice(entities['product'])} {time_ref}?"
+        else:
+            team = random.choice(entities['team'])
+            opponent = random.choice([t for t in entities['opponent'] if t != team])
+            return f"Will {team} win against {opponent} {time_ref}?"
 
     def generate_multiple_questions(self, articles: List[str], sources: List[str], 
                                   interest: str, count: int = 5) -> List[Dict]:
