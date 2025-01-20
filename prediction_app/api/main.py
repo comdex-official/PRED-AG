@@ -92,7 +92,7 @@ def get_manager(username: str = Header(...)) -> PredictionManager:
 
 @app.get("/health")
 async def root():
-    return {"message": "Healthy"}
+    return {"message": "Healthyy"}
 
 @app.post("/auth/login/", response_model=dict)
 async def login(username: str = Header(...)):
