@@ -90,6 +90,10 @@ def get_manager(username: str = Header(...)) -> PredictionManager:
 
 # Endpoints
 
+@app.get("/health")
+async def root():
+    return {"message": "Healthy"}
+
 @app.post("/auth/login/", response_model=dict)
 async def login(username: str = Header(...)):
     """Login or register a user."""
