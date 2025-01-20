@@ -75,11 +75,12 @@ class DatabaseManager:
             print(f"Database error: {str(e)}")
 
     def get_user_question_history(self, user_id: int, interest: Optional[str] = None) -> List[Dict]:
-        """Get questions viewed by a specific user"""
+        """Get questions answered by a specific user"""
         try:
             query = self.session.query(UserQuestionResponse, Question)\
                 .join(Question, UserQuestionResponse.question_id == Question.id)\
-                .filter(UserQuestionResponse.user_id == user_id)
+                .filter(UserQuestionResponse.user_id == user_id)\
+                .filter(UserQuestionResponse.response.isnot(None))  # Add filter for non-null response
             if interest:
                 query = query.filter(Question.interest == interest)
             results = query.order_by(UserQuestionResponse.viewed_at.desc()).all()

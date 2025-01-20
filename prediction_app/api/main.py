@@ -1,5 +1,7 @@
-from fastapi import FastAPI, HTTPException, Header, Query, Depends
-from typing import List, Optional
+from fastapi import FastAPI, HTTPException, Header, Query, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional, Union
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from enum import Enum
@@ -10,6 +12,34 @@ from prediction_app.managers.prediction_manager import PredictionManager
 
 
 app = FastAPI(title="Prediction Questions API")
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, username",
+        },
+        status_code=204,
+    )
+
 db_manager = DatabaseManager()
 
 # Pydantic Models
@@ -38,9 +68,17 @@ class QuestionHistoryItem(BaseModel):
     resolution: Optional[bool] = None  # True/False for correct/incorrect prediction
     resolved_at: Optional[str] = None
 
+class UserInfo(BaseModel):
+    user_id: int
+    username: str
+    interests: List[str]
+    responses: List[QuestionHistoryItem]
+
 # Dependencies
-def get_user(username: str = Header(...)) -> dict:
+def get_user(username: Union[str, None] = Header(default=None)) -> dict:
     """Fetch user from the database using the username from the header."""
+    if not username:
+        return {"id": None, "interests": []}
     user = db_manager.get_user(username)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -80,11 +118,14 @@ async def fetch_questions(
         ge=QUESTION_CONFIG["min_count"],
         le=QUESTION_CONFIG["max_count"]
     ),
-    user: dict = Depends(get_user),
-    manager: PredictionManager = Depends(get_manager),
+    username: Optional[str] = Header(default=None),  # Don't make username mandatory
+    user: Optional[dict] = Depends(get_user),  # Handle missing username gracefully
+    manager: Optional[PredictionManager] = Depends(get_manager),
     search: Optional[str] = None
 ):
-    """Fetch questions for the user based on their interests."""
+    if not username or not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
     interests = user["interests"]
     if not interests:
         raise HTTPException(status_code=400, detail="User has no interests")
@@ -196,3 +237,21 @@ async def resolve_question_internal(
     """Resolve a question (internal route)."""
     db_manager.resolve_question(question_id, result, note)
     return {"message": "Question resolved successfully"}
+
+@app.get("/user/info/", response_model=UserInfo)
+async def get_user_info(
+    user: dict = Depends(get_user)
+):
+    """Get detailed user information including responses."""
+    if not user or not user.get("id"):
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get user's question history
+    history = db_manager.get_user_question_history(user_id=user["id"])
+    
+    return {
+        "user_id": user["id"],
+        "username": user["username"],
+        "interests": user["interests"],
+        "responses": history
+    }
